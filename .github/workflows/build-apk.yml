@@ -1,0 +1,34 @@
+name: Build Chat Elvidio APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Creer le projet Android
+        run: flutter create --platforms=android --project-name chat_elvidio_app .
+
+      - name: Installer les dependances
+        run: flutter pub get
+
+      - name: Compiler l APK
+        run: flutter build apk --release --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+
+      - name: Publier l APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: chat-elvidio-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
