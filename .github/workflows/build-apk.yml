@@ -21,6 +21,9 @@ jobs:
       - name: Creer le projet Android
         run: flutter create --platforms=android --project-name chat_elvidio_app .
 
+      - name: Autoriser internet dans l APK
+        run: sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' android/app/src/main/AndroidManifest.xml
+
       - name: Installer les dependances
         run: flutter pub get
 
