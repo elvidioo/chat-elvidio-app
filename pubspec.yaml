@@ -12,6 +12,9 @@ dependencies:
   supabase_flutter: ^2.8.4
   image_picker: ^1.1.2
   url_launcher: ^6.3.1
+  nearby_connections: ^4.3.0
+  permission_handler: ^11.3.1
+  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_test:

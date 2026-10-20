@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'screens/nearby_screen.dart';
 import 'screens/profile_screen.dart';
 
 const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
@@ -188,6 +189,15 @@ class _AuthPageState extends State<AuthPage> {
                       ? 'Déjà inscrit ? Se connecter'
                       : 'Créer un nouveau compte'),
                 ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const NearbyScreen()),
+                  ),
+                  icon: const Icon(Icons.wifi_tethering),
+                  label: const Text('Mode proche (sans internet)'),
+                ),
                 if (message.isNotEmpty)
                   Text(message, style: const TextStyle(color: Colors.orange)),
               ],
@@ -227,6 +237,14 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         title: const Text('Chat Elvidio'),
         actions: [
+          IconButton(
+            tooltip: 'Mode proche (sans internet)',
+            icon: const Icon(Icons.wifi_tethering),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NearbyScreen()),
+            ),
+          ),
           IconButton(
             tooltip: 'Mon profil',
             icon: const Icon(Icons.account_circle_outlined),
