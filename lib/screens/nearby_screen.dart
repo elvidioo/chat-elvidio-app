@@ -9,6 +9,9 @@ import 'package:nearby_connections/nearby_connections.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../theme.dart';
+import '../widgets.dart';
+
 const _serviceId = 'com.elvidio.chat.nearby';
 
 class _NearbyMessage {
@@ -17,6 +20,7 @@ class _NearbyMessage {
   final String? text;
   final String? filePath;
   final bool mine;
+  final DateTime at = DateTime.now();
 
   _NearbyMessage({
     required this.id,
@@ -344,35 +348,121 @@ class _NearbyScreenState extends State<NearbyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mode proche (sans internet)')),
+      appBar: AppBar(title: const Text('Mode proche')),
       body: started ? chatBody() : welcomeBody(),
     );
   }
 
   Widget welcomeBody() {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Icon(Icons.wifi_tethering, size: 64, color: Color(0xFF00E5FF)),
-          const SizedBox(height: 16),
-          const Text(
-            'Discute avec les téléphones proches, sans internet. '
-            'Les autres doivent ouvrir le Mode proche aussi.',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            controller: nickname,
-            maxLength: 20,
-            decoration: const InputDecoration(
-              labelText: 'Ton pseudo',
-              border: OutlineInputBorder(),
+    return SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              children: [
+                const RadarPulse(size: 220),
+                const SizedBox(height: 24),
+                const Text(
+                  'Sans internet',
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Discute avec les téléphones proches, sans internet. '
+                  'Les autres doivent ouvrir le Mode proche aussi.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.muted),
+                ),
+                const SizedBox(height: 28),
+                TextField(
+                  controller: nickname,
+                  maxLength: 20,
+                  decoration: const InputDecoration(
+                    hintText: 'Ton pseudo',
+                    counterText: '',
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                GradientButton(label: 'Démarrer', onPressed: start),
+              ],
             ),
           ),
-          FilledButton(onPressed: start, child: const Text('Démarrer')),
+        ),
+      ),
+    );
+  }
+
+  Widget peersBar() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(bottom: BorderSide(color: AppColors.surface2)),
+      ),
+      child: peers.isEmpty
+          ? Row(
+              children: [
+                const Icon(Icons.radar, size: 18, color: AppColors.muted),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    statusText,
+                    style: const TextStyle(color: AppColors.muted),
+                  ),
+                ),
+                if (failed)
+                  TextButton(onPressed: start, child: const Text('Réessayer')),
+              ],
+            )
+          : SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: peers.values.map((unique) {
+                  final name = shortName(unique);
+                  return Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface2,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Row(
+                      children: [
+                        Avatar(name: name, size: 24),
+                        const SizedBox(width: 6),
+                        Text(name),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+    );
+  }
+
+  Widget emptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (failed)
+            const Icon(Icons.portable_wifi_off, size: 64, color: AppColors.muted)
+          else
+            const RadarPulse(size: 170),
+          const SizedBox(height: 16),
+          Text(
+            failed
+                ? 'Impossible de chercher des téléphones.'
+                : peers.isEmpty
+                    ? 'Recherche de téléphones proches...'
+                    : 'Connecté. Dis bonjour 👋',
+            style: const TextStyle(color: AppColors.muted),
+          ),
         ],
       ),
     );
@@ -382,28 +472,10 @@ class _NearbyScreenState extends State<NearbyScreen> {
     final shown = messages.reversed.toList();
     return Column(
       children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          color: const Color(0xFF1B1D2E),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  peers.isEmpty
-                      ? statusText
-                      : 'Connectés (${peers.length}) : '
-                          '${peers.values.map(shortName).join(', ')}',
-                ),
-              ),
-              if (failed && peers.isEmpty)
-                TextButton(onPressed: start, child: const Text('Réessayer')),
-            ],
-          ),
-        ),
+        peersBar(),
         Expanded(
           child: shown.isEmpty
-              ? const Center(child: Text('Aucun message pour le moment.'))
+              ? emptyState()
               : ListView.builder(
                   reverse: true,
                   padding: const EdgeInsets.all(12),
@@ -411,88 +483,38 @@ class _NearbyScreenState extends State<NearbyScreen> {
                   itemBuilder: (context, index) => bubble(shown[index]),
                 ),
         ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: sendPhoto,
-                  icon: const Icon(Icons.photo),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: input,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'Message hors ligne...',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (_) => sendText(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: sendText,
-                  icon: const Icon(Icons.send),
-                ),
-              ],
-            ),
-          ),
+        Composer(
+          controller: input,
+          onSend: sendText,
+          onAttach: sendPhoto,
+          hint: 'Message hors ligne...',
+          attachIcon: Icons.photo_outlined,
         ),
       ],
     );
   }
 
   Widget bubble(_NearbyMessage m) {
-    return Align(
-      alignment: m.mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 5),
-        padding: const EdgeInsets.all(8),
-        constraints: const BoxConstraints(maxWidth: 280),
-        decoration: BoxDecoration(
-          color: m.mine ? const Color(0xFF006B78) : const Color(0xFF292B3D),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!m.mine)
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 2),
-                child: Text(
-                  m.from,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF00E5FF),
-                  ),
-                ),
-              ),
-            if (m.filePath != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.file(
-                  File(m.filePath!),
+    return ChatBubble(
+      mine: m.mine,
+      sender: m.mine ? null : m.from,
+      text: m.text,
+      time: formatTime(m.at),
+      media: m.filePath == null
+          ? null
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(
+                File(m.filePath!),
+                width: 220,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox(
                   width: 220,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox(
-                    width: 220,
-                    height: 60,
-                    child: Center(child: Text('Fichier reçu')),
-                  ),
+                  height: 60,
+                  child: Center(child: Text('Fichier reçu')),
                 ),
               ),
-            if (m.text != null && m.text!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(4),
-                child: Text(m.text!),
-              ),
-          ],
-        ),
-      ),
+            ),
     );
   }
 }

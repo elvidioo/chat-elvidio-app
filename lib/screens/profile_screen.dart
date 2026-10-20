@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../theme.dart';
+import '../widgets.dart';
+
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.firstTime = false});
+
+  final bool firstTime;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -57,7 +62,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (user == null) return;
     if (pseudo.length < 3 || pseudo.length > 30) {
-      setState(() => _error = 'Le pseudo doit contenir entre 3 et 30 caractères.');
+      setState(
+          () => _error = 'Le pseudo doit contenir entre 3 et 30 caractères.');
       return;
     }
 
@@ -72,11 +78,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         'pseudo': pseudo,
       }, onConflict: 'id');
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profil enregistré !')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profil enregistré !')),
+      );
+      if (widget.firstTime) Navigator.pop(context);
     } on PostgrestException catch (e) {
       if (mounted) {
         setState(() => _error = e.code == '23505'
@@ -95,20 +101,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mon profil')),
+      appBar: AppBar(
+        title: Text(widget.firstTime ? 'Bienvenue !' : 'Mon profil'),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Center(child: Avatar(name: _pseudo.text, size: 96)),
+                  const SizedBox(height: 18),
+                  Text(
+                    widget.firstTime
+                        ? 'Choisis ton pseudo : c\'est le nom que verront tes amis.'
+                        : 'Ton pseudo visible par les autres.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.muted),
+                  ),
+                  const SizedBox(height: 22),
                   TextField(
                     controller: _pseudo,
                     maxLength: 30,
+                    onChanged: (_) => setState(() {}),
                     decoration: const InputDecoration(
-                      labelText: 'Pseudo',
-                      border: OutlineInputBorder(),
+                      hintText: 'Pseudo',
+                      prefixIcon: Icon(Icons.person_outline),
                     ),
                   ),
                   if (_error != null)
@@ -116,12 +135,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Text(
                         _error!,
-                        style: const TextStyle(color: Colors.orange),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.orangeAccent),
                       ),
                     ),
-                  FilledButton(
-                    onPressed: _saving ? null : _saveProfile,
-                    child: Text(_saving ? 'Enregistrement...' : 'Enregistrer'),
+                  const SizedBox(height: 6),
+                  GradientButton(
+                    label: 'Enregistrer',
+                    loading: _saving,
+                    onPressed: _saveProfile,
                   ),
                 ],
               ),
