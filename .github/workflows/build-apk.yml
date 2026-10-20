@@ -69,6 +69,11 @@ jobs:
               print("namespace ajoute :", gradle)
           PY
 
+      - name: Utiliser une cle de signature fixe (mises a jour possibles)
+        run: |
+          mkdir -p ~/.android
+          cp ci/debug.keystore ~/.android/debug.keystore
+
       - name: Compiler l APK
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -87,6 +92,16 @@ jobs:
           if [ -n "$SUPABASE_ANON_KEY" ]; then sed -i "s|$SUPABASE_ANON_KEY|***|g" /tmp/err.txt; fi
           MSG=$(cut -c1-300 /tmp/err.txt | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::error title=Erreurs de compilation::$MSG"
+
+      - name: Publier l APK sur la page Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk chat-elvidio.apk
+          gh release create "build-${{ github.run_number }}" chat-elvidio.apk \
+            --title "Chat Elvidio build ${{ github.run_number }}" \
+            --notes "APK de test. Telecharge chat-elvidio.apk puis installe-le." \
+            --latest
 
       - name: Publier l APK
         uses: actions/upload-artifact@v4
