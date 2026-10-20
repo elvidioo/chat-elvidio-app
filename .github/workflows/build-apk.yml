@@ -77,26 +77,16 @@ jobs:
           set -o pipefail
           flutter build apk --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build.log
 
-      - name: Publier le journal d erreur
+      - name: Afficher les erreurs de compilation
         if: failure()
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          mkdir -p /tmp/lg
-          if [ -n "$SUPABASE_ANON_KEY" ]; then
-            tail -n 300 build.log | sed "s|$SUPABASE_ANON_KEY|***|g" > /tmp/lg/build.log
-          else
-            tail -n 300 build.log > /tmp/lg/build.log
-          fi
-          git config user.name "ci"
-          git config user.email "ci@users.noreply.github.com"
-          git checkout --orphan build-logs
-          git rm -rf . -q
-          cp /tmp/lg/build.log build.log
-          git add build.log
-          git commit -q -m "journal de compilation"
-          git push -f origin build-logs
+          grep -nE "error|Error|FAILURE|went wrong|Could not|e: |Execution failed|not found|Unresolved|undefined|isn.t defined|doesn.t" build.log | head -25 > /tmp/err.txt || true
+          if [ -n "$SUPABASE_ANON_KEY" ]; then sed -i "s|$SUPABASE_ANON_KEY|***|g" /tmp/err.txt; fi
+          MSG=$(cut -c1-300 /tmp/err.txt | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Erreurs de compilation::$MSG"
 
       - name: Publier l APK
         uses: actions/upload-artifact@v4
