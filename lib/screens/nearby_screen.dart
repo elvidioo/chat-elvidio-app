@@ -44,6 +44,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
 
   late String uniqueName;
   bool started = false;
+  bool failed = false;
   String statusText = '';
 
   final peers = <String, String>{}; // endpointId -> nom unique (connectés)
@@ -76,6 +77,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
     uniqueName = '$base#${1000 + Random().nextInt(9000)}';
     setState(() {
       started = true;
+      failed = false;
       statusText = 'Autorisations...';
     });
 
@@ -88,14 +90,23 @@ class _NearbyScreenState extends State<NearbyScreen> {
     ].request();
 
     if (!(results[Permission.location]?.isGranted ?? false)) {
-      setState(() => statusText =
-          'Autorise la localisation et le Bluetooth pour trouver les téléphones proches.');
+      setState(() {
+        failed = true;
+        statusText =
+            'Autorise la localisation et le Bluetooth pour trouver les téléphones proches.';
+      });
       return;
     }
 
     try {
-      if (!await nearby.checkLocationEnabled()) {
-        await nearby.enableLocationServices();
+      final gpsOn = await Permission.location.serviceStatus.isEnabled;
+      if (!gpsOn) {
+        setState(() {
+          failed = true;
+          statusText =
+              'Active la localisation (GPS) du téléphone, puis appuie sur Réessayer.';
+        });
+        return;
       }
     } catch (_) {}
 
@@ -137,8 +148,11 @@ class _NearbyScreenState extends State<NearbyScreen> {
       );
       setState(() => statusText = 'Recherche de téléphones proches...');
     } catch (e) {
-      setState(() => statusText =
-          'Impossible de démarrer (Bluetooth et localisation activés ?).');
+      setState(() {
+        failed = true;
+        statusText =
+            'Impossible de démarrer (Bluetooth et localisation activés ?).';
+      });
     }
   }
 
@@ -372,11 +386,19 @@ class _NearbyScreenState extends State<NearbyScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           color: const Color(0xFF1B1D2E),
-          child: Text(
-            peers.isEmpty
-                ? statusText
-                : 'Connectés (${peers.length}) : '
-                    '${peers.values.map(shortName).join(', ')}',
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  peers.isEmpty
+                      ? statusText
+                      : 'Connectés (${peers.length}) : '
+                          '${peers.values.map(shortName).join(', ')}',
+                ),
+              ),
+              if (failed && peers.isEmpty)
+                TextButton(onPressed: start, child: const Text('Réessayer')),
+            ],
           ),
         ),
         Expanded(
