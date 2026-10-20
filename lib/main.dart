@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,15 +21,99 @@ const supabaseKey = _envKey == ''
     : _envKey;
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(() {
+    WidgetsFlutterBinding.ensureInitialized();
+    ErrorWidget.builder = (details) => Material(
+          color: AppColors.bg,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Erreur d\'affichage :\n${details.exceptionAsString()}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.orangeAccent),
+              ),
+            ),
+          ),
+        );
+    runApp(const BootApp());
+  }, (error, stack) {
+    debugPrint('Erreur non gérée : $error');
+  });
+}
 
-  if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
-    runApp(const SetupApp());
-    return;
+/// Affiche tout de suite un écran de chargement, puis démarre Supabase.
+/// En cas de problème, l'erreur s'affiche au lieu d'un écran noir.
+class BootApp extends StatefulWidget {
+  const BootApp({super.key});
+
+  @override
+  State<BootApp> createState() => _BootAppState();
+}
+
+class _BootAppState extends State<BootApp> {
+  late Future<void> boot = _boot();
+
+  Future<void> _boot() {
+    return Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey)
+        .timeout(const Duration(seconds: 20))
+        .then((_) {});
   }
 
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
-  runApp(const ChatElvidioApp());
+  Widget _screen(Widget child) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(),
+      home: Scaffold(body: Center(child: child)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: boot,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _screen(Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const AppLogo(),
+                const SizedBox(height: 20),
+                const Text(
+                  'Démarrage impossible',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '${snapshot.error}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.muted),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => setState(() => boot = _boot()),
+                  child: const Text('Réessayer'),
+                ),
+              ],
+            ),
+          ));
+        }
+        if (snapshot.connectionState != ConnectionState.done) {
+          return _screen(const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppLogo(),
+              SizedBox(height: 24),
+              CircularProgressIndicator(),
+            ],
+          ));
+        }
+        return const ChatElvidioApp();
+      },
+    );
+  }
 }
 
 class SetupApp extends StatelessWidget {
