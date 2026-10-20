@@ -226,6 +226,16 @@ class _HomePageState extends State<HomePage> {
         title: const Text('Chat Elvidio'),
         actions: [
           IconButton(
+            tooltip: 'Mon profil',
+            icon: const Icon(Icons.account_circle_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            ).then((_) {
+              if (mounted) setState(() {});
+            }),
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await supabase.auth.signOut();

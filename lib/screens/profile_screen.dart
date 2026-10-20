@@ -79,55 +79,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } on PostgrestException catch (e) {
       if (mounted) {
-        setState(() => _
-cd ~/chat-elvidio-app && python - <<'PY'
-from pathlib import Path
+        setState(() => _error = e.code == '23505'
+            ? 'Ce pseudo est déjà pris.'
+            : 'Enregistrement impossible : ${e.message}');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Erreur réseau. Réessaie.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
 
-p = Path("lib/main.dart")
-s = p.read_text()
-
-imp = "import 'screens/profile_screen.dart';"
-if imp not in s:
-    s = s.replace(
-        "import 'package:supabase_flutter/supabase_flutter.dart';",
-        "import 'package:supabase_flutter/supabase_flutter.dart';\n" + imp,
-        1
-    )
-
-start = s.find("class HomePage")
-if start == -1:
-    start = s.find("class HomeScreen")
-
-if start == -1:
-    print("Écran d'accueil introuvable : fichier non modifié.")
-    raise SystemExit(1)
-
-end = s.find("\nclass ", start + 1)
-if end == -1:
-    end = len(s)
-
-home = s[start:end]
-button = """IconButton(
-  tooltip: 'Mon profil',
-  icon: const Icon(Icons.account_circle_outlined),
-  onPressed: () => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => const ProfileScreen()),
-  ),
-),"""
-
-if "const ProfileScreen()" in home:
-    print("Le profil est déjà relié à l'accueil.")
-elif "actions: [" in home:
-    home = home.replace("actions: [", "actions: [\n" + button, 1)
-    s = s[:start] + home + s[end:]
-    p.write_text(s)
-    print("Bouton de profil ajouté à la barre d'actions.")
-else:
-    print("Barre d'actions introuvable : fichier
-
-cd ~/chat-elvidio-app && flutter analyze
-
-
-
-
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Mon profil')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _pseudo,
+                    maxLength: 30,
+                    decoration: const InputDecoration(
+                      labelText: 'Pseudo',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.orange),
+                      ),
+                    ),
+                  FilledButton(
+                    onPressed: _saving ? null : _saveProfile,
+                    child: Text(_saving ? 'Enregistrement...' : 'Enregistrer'),
+                  ),
+                ],
+              ),
+            ),
+    );
+  }
+}
