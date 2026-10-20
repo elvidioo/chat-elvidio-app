@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -67,7 +70,33 @@ jobs:
           PY
 
       - name: Compiler l APK
-        run: flutter build apk --release --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -o pipefail
+          flutter build apk --release --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build.log
+
+      - name: Publier le journal d erreur
+        if: failure()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          mkdir -p /tmp/lg
+          if [ -n "$SUPABASE_ANON_KEY" ]; then
+            tail -n 300 build.log | sed "s|$SUPABASE_ANON_KEY|***|g" > /tmp/lg/build.log
+          else
+            tail -n 300 build.log > /tmp/lg/build.log
+          fi
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git checkout --orphan build-logs
+          git rm -rf . -q
+          cp /tmp/lg/build.log build.log
+          git add build.log
+          git commit -q -m "journal de compilation"
+          git push -f origin build-logs
 
       - name: Publier l APK
         uses: actions/upload-artifact@v4
