@@ -98,7 +98,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp build/app/outputs/flutter-apk/app-release.apk chat-elvidio.apk
-          gh release create "build-${{ github.run_number }}" chat-elvidio.apk \
+          zip chat-elvidio-apk.zip chat-elvidio.apk
+          gh release create "build-${{ github.run_number }}" chat-elvidio.apk chat-elvidio-apk.zip \
             --title "Chat Elvidio build ${{ github.run_number }}" \
             --notes "APK de test. Telecharge chat-elvidio.apk puis installe-le." \
             --latest
