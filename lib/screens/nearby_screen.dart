@@ -488,7 +488,11 @@ class _NearbyScreenState extends State<NearbyScreen> {
           onSend: sendText,
           onAttach: sendPhoto,
           hint: 'Message hors ligne...',
-          attachIcon: Icons.photo_outlined,
+          attachIcon: Icons.photo_library_rounded,
+          onLike: () {
+            input.text = '\u{1F44D}';
+            sendText();
+          },
         ),
       ],
     );
@@ -498,6 +502,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
     return ChatBubble(
       mine: m.mine,
       sender: m.mine ? null : m.from,
+      avatarName: m.mine ? null : m.from,
       text: m.text,
       time: formatTime(m.at),
       media: m.filePath == null

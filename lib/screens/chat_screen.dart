@@ -22,7 +22,6 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   static const maxMediaBytes = 50 * 1024 * 1024;
-  static const videoExt = ['mp4', 'mov', '3gp', 'webm', 'mkv'];
 
   final supabase = Supabase.instance.client;
   final picker = ImagePicker();
@@ -49,6 +48,22 @@ class _ChatScreenState extends State<ChatScreen> {
         'content': content,
       });
       messageController.clear();
+    } catch (_) {
+      toast('Envoi impossible. Réessaie.');
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
+  Future<void> sendLike() async {
+    if (sending) return;
+    setState(() => sending = true);
+    try {
+      await supabase.from('messages').insert({
+        'sender': uid,
+        'receiver': widget.receiverId,
+        'content': '\u{1F44D}',
+      });
     } catch (_) {
       toast('Envoi impossible. Réessaie.');
     } finally {
@@ -131,13 +146,8 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  bool isVideo(String url) {
-    final clean = url.split('?').first.toLowerCase();
-    return videoExt.any(clean.endsWith);
-  }
-
   Widget mediaBubble(String url) {
-    if (isVideo(url)) {
+    if (isVideoUrl(url)) {
       return GestureDetector(
         onTap: () =>
             launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
@@ -145,15 +155,18 @@ class _ChatScreenState extends State<ChatScreen> {
           width: 210,
           height: 120,
           decoration: BoxDecoration(
-            color: Colors.black38,
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.black87,
+            borderRadius: BorderRadius.circular(18),
           ),
           child: const Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.play_circle_fill, size: 48),
+              Icon(Icons.play_circle_fill, size: 48, color: Colors.white),
               SizedBox(height: 6),
-              Text('Vidéo · toucher pour lire'),
+              Text(
+                'Vidéo · toucher pour lire',
+                style: TextStyle(color: Colors.white),
+              ),
             ],
           ),
         ),
@@ -169,7 +182,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
         child: Image.network(
           url,
           width: 220,
@@ -197,6 +210,18 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  DateTime? createdAt(Map<String, dynamic> m) =>
+      DateTime.tryParse(m['created_at']?.toString() ?? '')?.toLocal();
+
+  bool sameGroup(Map<String, dynamic>? a, Map<String, dynamic>? b) {
+    if (a == null || b == null) return false;
+    if (a['sender'] != b['sender']) return false;
+    final ta = createdAt(a);
+    final tb = createdAt(b);
+    if (ta == null || tb == null) return true;
+    return ta.difference(tb).abs().inMinutes < 5;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -205,14 +230,19 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Row(
           children: [
             Avatar(name: widget.receiverName, size: 38),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 widget.receiverName,
                 overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
               ),
             ),
           ],
+        ),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, color: AppColors.surface2),
         ),
       ),
       body: Column(
@@ -227,6 +257,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (!snapshot.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
+                // Du plus récent au plus ancien (liste inversée).
                 final messages = snapshot.data!
                     .where((m) =>
                         (m['sender'] == uid &&
@@ -239,11 +270,19 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Avatar(name: widget.receiverName, size: 72),
-                        const SizedBox(height: 14),
+                        Avatar(name: widget.receiverName, size: 80),
+                        const SizedBox(height: 12),
                         Text(
-                          'Dis bonjour à ${widget.receiverName} 👋',
-                          style: const TextStyle(color: AppColors.muted),
+                          widget.receiverName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Dis bonjour \u{1F44B}',
+                          style: TextStyle(color: AppColors.muted),
                         ),
                       ],
                     ),
@@ -252,21 +291,36 @@ class _ChatScreenState extends State<ChatScreen> {
 
                 return ListView.builder(
                   reverse: true,
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                   itemCount: messages.length,
                   itemBuilder: (context, index) {
                     final item = messages[index];
+                    final older =
+                        index + 1 < messages.length ? messages[index + 1] : null;
+                    final newer = index > 0 ? messages[index - 1] : null;
                     final mediaUrl = item['media_url']?.toString();
-                    final created =
-                        DateTime.tryParse(item['created_at']?.toString() ?? '')
-                            ?.toLocal();
-                    return ChatBubble(
-                      mine: item['sender'] == uid,
-                      text: item['content']?.toString(),
-                      media: (mediaUrl != null && mediaUrl.isNotEmpty)
-                          ? mediaBubble(mediaUrl)
-                          : null,
-                      time: formatTime(created),
+                    final time = createdAt(item);
+                    final olderTime = older == null ? null : createdAt(older);
+                    final showHeader = time != null &&
+                        (olderTime == null ||
+                            time.difference(olderTime).inMinutes >= 30);
+
+                    return Column(
+                      children: [
+                        if (showHeader) TimeHeader(time),
+                        ChatBubble(
+                          mine: item['sender'] == uid,
+                          text: item['content']?.toString(),
+                          media: (mediaUrl != null && mediaUrl.isNotEmpty)
+                              ? mediaBubble(mediaUrl)
+                              : null,
+                          avatarName: item['sender'] == uid
+                              ? null
+                              : widget.receiverName,
+                          joinedAbove: !showHeader && sameGroup(item, older),
+                          joinedBelow: sameGroup(item, newer),
+                        ),
+                      ],
                     );
                   },
                 );
@@ -278,6 +332,7 @@ class _ChatScreenState extends State<ChatScreen> {
             controller: messageController,
             onSend: sendMessage,
             onAttach: pickMedia,
+            onLike: sendLike,
             sending: sending,
           ),
         ],

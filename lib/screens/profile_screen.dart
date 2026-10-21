@@ -3,11 +3,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../theme.dart';
 import '../widgets.dart';
+import 'auth_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key, this.firstTime = false});
+  const ProfileScreen({
+    super.key,
+    this.firstTime = false,
+    this.showLogout = false,
+    this.onSaved,
+  });
 
   final bool firstTime;
+  final bool showLogout;
+  final VoidCallback? onSaved;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -83,6 +91,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SnackBar(content: Text('Profil enregistré !')),
       );
       if (widget.firstTime) Navigator.pop(context);
+      widget.onSaved?.call();
     } on PostgrestException catch (e) {
       if (mounted) {
         setState(() => _error = e.code == '23505'
@@ -96,6 +105,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _logout() async {
+    await _db.auth.signOut();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
+      (_) => false,
+    );
   }
 
   @override
@@ -145,6 +164,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     loading: _saving,
                     onPressed: _saveProfile,
                   ),
+                  if (widget.showLogout) ...[
+                    const SizedBox(height: 28),
+                    TextButton.icon(
+                      onPressed: _logout,
+                      icon: const Icon(Icons.logout, color: Colors.redAccent),
+                      label: const Text(
+                        'Se déconnecter',
+                        style: TextStyle(color: Colors.redAccent),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

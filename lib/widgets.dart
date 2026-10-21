@@ -2,15 +2,41 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
+const _videoExt = ['mp4', 'mov', '3gp', 'webm', 'mkv'];
+
+bool isVideoUrl(String url) {
+  final clean = url.split('?').first.toLowerCase();
+  return _videoExt.any(clean.endsWith);
+}
+
+String _two(int n) => n.toString().padLeft(2, '0');
+
 String formatTime(DateTime? date) {
   if (date == null) return '';
-  String two(int n) => n.toString().padLeft(2, '0');
-  return '${two(date.hour)}:${two(date.minute)}';
+  return '${_two(date.hour)}:${_two(date.minute)}';
+}
+
+bool _sameDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+/// Heure dans la liste des discussions : 14:32, Hier, 05/10.
+String formatListTime(DateTime? date) {
+  if (date == null) return '';
+  final now = DateTime.now();
+  if (_sameDay(date, now)) return formatTime(date);
+  if (_sameDay(date, now.subtract(const Duration(days: 1)))) return 'Hier';
+  return '${_two(date.day)}/${_two(date.month)}';
+}
+
+/// Séparateur de temps dans une conversation.
+String formatHeaderTime(DateTime date) {
+  if (_sameDay(date, DateTime.now())) return formatTime(date);
+  return '${_two(date.day)}/${_two(date.month)} ${formatTime(date)}';
 }
 
 Color _avatarColor(String name) {
   const palette = [
-    Color(0xFF00B8D4),
+    Color(0xFF0084FF),
     Color(0xFF7C4DFF),
     Color(0xFFFF6D91),
     Color(0xFFFFA726),
@@ -94,7 +120,7 @@ class GradientButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             gradient: AppColors.gradient,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(26),
           ),
           child: loading
               ? const SizedBox(
@@ -119,6 +145,8 @@ class GradientButton extends StatelessWidget {
   }
 }
 
+/// Bulle de message façon Messenger : bleue pour moi, grise pour l'autre,
+/// coins resserrés quand plusieurs messages se suivent.
 class ChatBubble extends StatelessWidget {
   const ChatBubble({
     super.key,
@@ -127,6 +155,9 @@ class ChatBubble extends StatelessWidget {
     this.media,
     this.text,
     this.time,
+    this.avatarName,
+    this.joinedAbove = false,
+    this.joinedBelow = false,
   });
 
   final bool mine;
@@ -134,27 +165,40 @@ class ChatBubble extends StatelessWidget {
   final Widget? media;
   final String? text;
   final String? time;
+  final String? avatarName;
+  final bool joinedAbove;
+  final bool joinedBelow;
+
+  BorderRadius _radius() {
+    const big = Radius.circular(18);
+    const small = Radius.circular(4);
+    return BorderRadius.only(
+      topLeft: (!mine && joinedAbove) ? small : big,
+      bottomLeft: (!mine && joinedBelow) ? small : big,
+      topRight: (mine && joinedAbove) ? small : big,
+      bottomRight: (mine && joinedBelow) ? small : big,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final hasText = text != null && text!.isNotEmpty;
-    return Align(
-      alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 3),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.78,
-        ),
+    final onlyMedia = media != null && !hasText && sender == null;
+    final bigEmoji = hasText && media == null && text!.trim() == '\u{1F44D}';
+    final reserveAvatar = !mine && avatarName != null;
+    final showAvatar = reserveAvatar && !joinedBelow;
+
+    final Widget content;
+    if (bigEmoji) {
+      content = const Text('\u{1F44D}', style: TextStyle(fontSize: 46));
+    } else if (onlyMedia) {
+      content = media!;
+    } else {
+      content = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          gradient: mine ? AppColors.gradient : null,
-          color: mine ? null : AppColors.surface2,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(18),
-            topRight: const Radius.circular(18),
-            bottomLeft: Radius.circular(mine ? 18 : 4),
-            bottomRight: Radius.circular(mine ? 4 : 18),
-          ),
+          color: mine ? AppColors.primary : AppColors.bubbleTheirs,
+          borderRadius: _radius(),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +210,7 @@ class ChatBubble extends StatelessWidget {
                 child: Text(
                   sender!,
                   style: const TextStyle(
-                    color: AppColors.cyan,
+                    color: AppColors.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -178,7 +222,14 @@ class ChatBubble extends StatelessWidget {
                 child: media,
               ),
             if (hasText)
-              Text(text!, style: const TextStyle(fontSize: 15.5, height: 1.3)),
+              Text(
+                text!,
+                style: TextStyle(
+                  fontSize: 15.5,
+                  height: 1.3,
+                  color: mine ? Colors.white : AppColors.text,
+                ),
+              ),
             if (time != null && time!.isNotEmpty)
               Align(
                 alignment: Alignment.bottomRight,
@@ -186,88 +237,145 @@ class ChatBubble extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 2),
                   child: Text(
                     time!,
-                    style: const TextStyle(fontSize: 11, color: Colors.white70),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: mine ? Colors.white70 : AppColors.muted,
+                    ),
                   ),
                 ),
               ),
           ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(top: joinedAbove ? 1.5 : 6),
+      child: Row(
+        mainAxisAlignment:
+            mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (reserveAvatar)
+            SizedBox(
+              width: 34,
+              child: showAvatar ? Avatar(name: avatarName!, size: 26) : null,
+            ),
+          Flexible(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.72,
+              ),
+              child: content,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TimeHeader extends StatelessWidget {
+  const TimeHeader(this.date, {super.key});
+
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Text(
+          formatHeaderTime(date),
+          style: const TextStyle(fontSize: 12, color: AppColors.muted),
         ),
       ),
     );
   }
 }
 
-class Composer extends StatelessWidget {
+/// Zone de saisie façon Messenger : champ "Aa", puis envoyer ou pouce.
+class Composer extends StatefulWidget {
   const Composer({
     super.key,
     required this.controller,
     required this.onSend,
     this.onAttach,
-    this.hint = 'Écris un message...',
+    this.onLike,
+    this.hint = 'Aa',
     this.sending = false,
-    this.attachIcon = Icons.add_photo_alternate_outlined,
+    this.attachIcon = Icons.photo_library_rounded,
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
   final VoidCallback? onAttach;
+  final VoidCallback? onLike;
   final String hint;
   final bool sending;
   final IconData attachIcon;
 
   @override
+  State<Composer> createState() => _ComposerState();
+}
+
+class _ComposerState extends State<Composer> {
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_changed);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final hasText = widget.controller.text.trim().isNotEmpty;
+    final likeMode = !hasText && widget.onLike != null;
     return SafeArea(
       top: false,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          border: Border(top: BorderSide(color: AppColors.surface2)),
-        ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            if (onAttach != null)
+            if (widget.onAttach != null)
               IconButton(
-                onPressed: sending ? null : onAttach,
-                icon: Icon(attachIcon, color: AppColors.cyan),
+                onPressed: widget.sending ? null : widget.onAttach,
+                icon: Icon(widget.attachIcon, color: AppColors.primary),
               ),
             Expanded(
               child: TextField(
-                controller: controller,
+                controller: widget.controller,
                 minLines: 1,
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  hintText: hint,
-                  fillColor: AppColors.surface2,
+                  hintText: widget.hint,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 18,
-                    vertical: 12,
+                    vertical: 10,
                   ),
                 ),
-                onSubmitted: (_) => onSend(),
+                onSubmitted: (_) => widget.onSend(),
               ),
             ),
-            const SizedBox(width: 8),
-            Opacity(
-              opacity: sending ? 0.5 : 1,
-              child: GestureDetector(
-                onTap: sending ? null : onSend,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: AppColors.gradient,
-                  ),
-                  child: const Icon(
-                    Icons.send_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
+            IconButton(
+              onPressed: widget.sending
+                  ? null
+                  : (likeMode ? widget.onLike : widget.onSend),
+              icon: Icon(
+                likeMode ? Icons.thumb_up_alt_rounded : Icons.send_rounded,
+                color: AppColors.primary,
+                size: 28,
               ),
             ),
           ],
@@ -321,7 +429,8 @@ class _RadarPulseState extends State<RadarPulse>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: AppColors.cyan.withAlpha((200 * (1 - t)).toInt()),
+                        color:
+                            AppColors.primary.withAlpha((200 * (1 - t)).toInt()),
                         width: 2,
                       ),
                     ),

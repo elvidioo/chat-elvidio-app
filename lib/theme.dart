@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 
+/// Palette inspirée de Messenger (clair).
 class AppColors {
-  static const bg = Color(0xFF0B0D17);
-  static const surface = Color(0xFF151827);
-  static const surface2 = Color(0xFF1E2236);
-  static const cyan = Color(0xFF00E5FF);
+  static const bg = Color(0xFFFFFFFF);
+  static const surface = Color(0xFFF0F2F5);
+  static const surface2 = Color(0xFFE4E6EB);
+  static const primary = Color(0xFF0084FF);
+  static const cyan = primary; // ancien nom, gardé pour compatibilité
   static const violet = Color(0xFF7C4DFF);
-  static const muted = Color(0xFF8A90A8);
+  static const muted = Color(0xFF65676B);
+  static const text = Color(0xFF050505);
+  static const bubbleTheirs = Color(0xFFF0F0F0);
+  static const online = Color(0xFF31A24C);
 
   static const gradient = LinearGradient(
-    colors: [Color(0xFF00C2E0), Color(0xFF7C4DFF)],
+    colors: [Color(0xFF0099FF), Color(0xFF0084FF)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -17,17 +22,17 @@ class AppColors {
 
 ThemeData buildTheme() {
   final scheme = ColorScheme.fromSeed(
-    seedColor: AppColors.cyan,
-    brightness: Brightness.dark,
+    seedColor: AppColors.primary,
+    brightness: Brightness.light,
   ).copyWith(
-    primary: AppColors.cyan,
-    onPrimary: Colors.black,
-    secondary: AppColors.violet,
-    surface: AppColors.surface,
+    primary: AppColors.primary,
+    onPrimary: Colors.white,
+    surface: AppColors.bg,
+    onSurface: AppColors.text,
   );
 
   OutlineInputBorder border(Color color) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         borderSide: BorderSide(color: color, width: 1.2),
       );
 
@@ -37,23 +42,25 @@ ThemeData buildTheme() {
     scaffoldBackgroundColor: AppColors.bg,
     appBarTheme: const AppBarTheme(
       backgroundColor: AppColors.bg,
+      foregroundColor: AppColors.text,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
       titleTextStyle: TextStyle(
         fontSize: 20,
         fontWeight: FontWeight.w700,
-        color: Colors.white,
+        color: AppColors.text,
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: AppColors.surface,
       contentPadding:
-          const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       border: border(Colors.transparent),
       enabledBorder: border(Colors.transparent),
-      focusedBorder: border(AppColors.cyan),
+      focusedBorder: border(AppColors.primary),
       hintStyle: const TextStyle(color: AppColors.muted),
       labelStyle: const TextStyle(color: AppColors.muted),
     ),
@@ -61,14 +68,19 @@ ThemeData buildTheme() {
       style: FilledButton.styleFrom(
         minimumSize: const Size(0, 52),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(26),
         ),
         textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       ),
     ),
+    navigationBarTheme: const NavigationBarThemeData(
+      backgroundColor: AppColors.bg,
+      surfaceTintColor: Colors.transparent,
+      indicatorColor: Color(0xFFE7F3FF),
+    ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: AppColors.surface2,
+      backgroundColor: const Color(0xFF323436),
       contentTextStyle: const TextStyle(color: Colors.white),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
