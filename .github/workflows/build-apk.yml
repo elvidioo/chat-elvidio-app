@@ -45,6 +45,49 @@ jobs:
                   f.write_text(g)
           PY
 
+      - name: Forcer la signature avec la cle fixe
+        run: |
+          python3 - <<'PY'
+          import sys
+          from pathlib import Path
+          ks = Path("ci/debug.keystore").resolve()
+          kts = Path("android/app/build.gradle.kts")
+          groovy = Path("android/app/build.gradle")
+          cfg_kts = (
+              'signingConfig = signingConfigs.create("fixed") {\n'
+              '                storeFile = file("%s")\n'
+              '                storeType = "pkcs12"\n'
+              '                storePassword = "android"\n'
+              '                keyAlias = "androiddebugkey"\n'
+              '                keyPassword = "android"\n'
+              '            }' % ks
+          )
+          cfg_groovy = (
+              'signingConfig signingConfigs.create("fixed") {\n'
+              '                storeFile file("%s")\n'
+              '                storeType "pkcs12"\n'
+              '                storePassword "android"\n'
+              '                keyAlias "androiddebugkey"\n'
+              '                keyPassword "android"\n'
+              '            }' % ks
+          )
+          done = False
+          if kts.exists():
+              s = kts.read_text()
+              old = 'signingConfig = signingConfigs.getByName("debug")'
+              if old in s:
+                  kts.write_text(s.replace(old, cfg_kts, 1)); done = True
+          if not done and groovy.exists():
+              s = groovy.read_text()
+              for old in ('signingConfig signingConfigs.debug', 'signingConfig = signingConfigs.debug'):
+                  if old in s:
+                      groovy.write_text(s.replace(old, cfg_groovy, 1)); done = True; break
+          print("signature fixe appliquee :", done)
+          if not done:
+              print("::error title=Signature::motif de signature introuvable dans build.gradle")
+              sys.exit(1)
+          PY
+
       - name: Installer les dependances
         run: flutter pub get
 
