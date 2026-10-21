@@ -48,6 +48,11 @@ jobs:
       - name: Installer les dependances
         run: flutter pub get
 
+      - name: Versions des plugins
+        run: |
+          V=$(awk '/^  (shared_preferences|shared_preferences_android|supabase_flutter|gotrue|path_provider_android):/{n=$1} /^    version:/{if(n){printf "%s %s | ", n, $2; n=""}}' pubspec.lock)
+          echo "::notice title=Versions::$V"
+
       - name: Corriger les plugins sans namespace
         run: |
           python3 - <<'PY'

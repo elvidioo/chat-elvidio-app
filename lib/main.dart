@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
+import 'storage.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -55,7 +56,15 @@ class _BootAppState extends State<BootApp> {
   late Future<void> boot = _boot();
 
   Future<void> _boot() {
-    return Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey)
+    return Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseKey,
+      authOptions: const FlutterAuthClientOptions(
+        authFlowType: AuthFlowType.implicit,
+        localStorage: FileLocalStorage(),
+        pkceAsyncStorage: FileAsyncStorage(),
+      ),
+    )
         .timeout(const Duration(seconds: 20))
         .then((_) {});
   }
