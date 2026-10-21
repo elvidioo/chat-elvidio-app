@@ -14,25 +14,106 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final email = TextEditingController();
+  final pseudo = TextEditingController();
+  final identifier = TextEditingController();
   final password = TextEditingController();
   bool loading = false;
   bool signup = false;
   bool hidePassword = true;
   String message = '';
 
+  // E-mail tel quel, ou numéro de téléphone -> adresse interne (sans SMS).
+  String? loginEmail(String raw) {
+    final id = raw.trim().toLowerCase();
+    if (id.contains('@')) {
+      return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(id) ? id : null;
+    }
+    var digits = id.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('00')) digits = digits.substring(2);
+    if (digits.length < 8 || digits.length > 15) return null;
+    return '$digits@phone.chatelvidio.app';
+  }
+
   String friendly(String raw) {
     final m = raw.toLowerCase();
-    if (m.contains('invalid login')) return 'E-mail ou mot de passe incorrect.';
-    if (m.contains('already')) return 'Cet e-mail est déjà utilisé.';
+    if (m.contains('invalid login')) {
+      return 'Identifiant ou mot de passe incorrect.';
+    }
+    if (m.contains('already')) return 'Ce compte existe déjà.';
     if (m.contains('password')) {
       return 'Mot de passe trop court (6 caractères minimum).';
     }
-    if (m.contains('email')) return 'Adresse e-mail invalide.';
     return raw;
   }
 
+  String? codeMessage(String? code) {
+    switch (code) {
+      case 'pseudo_taken':
+        return 'Ce pseudo est déjà pris.';
+      case 'already_registered':
+        return 'Ce numéro ou cet e-mail a déjà un compte.';
+      case 'weak_password':
+        return 'Mot de passe trop court (6 caractères minimum).';
+      case 'invalid_identifier':
+        return 'E-mail ou numéro invalide.';
+      case 'invalid_pseudo':
+        return 'Pseudo invalide (3 à 30 caractères : lettres, chiffres, . _ -).';
+    }
+    return null;
+  }
+
+  // Création du compte : la fonction "register" confirme le compte tout de
+  // suite (aucun e-mail envoyé) et enregistre le pseudo.
+  Future<void> register(String mail, String chosenPseudo) async {
+    final client = Supabase.instance.client;
+    try {
+      await client.functions.invoke('register', body: {
+        'identifier': identifier.text.trim(),
+        'password': password.text,
+        'pseudo': chosenPseudo,
+      });
+    } on FunctionException catch (e) {
+      final details = e.details;
+      final code = details is Map ? details['error']?.toString() : null;
+      final known = codeMessage(code);
+      if (known != null) throw _FormError(known);
+      if (e.status == 404 || e.status >= 500) {
+        // Secours : inscription classique si la fonction est indisponible.
+        await client.auth.signUp(email: mail, password: password.text);
+        if (client.auth.currentSession == null) {
+          await client.auth
+              .signInWithPassword(email: mail, password: password.text);
+        }
+        try {
+          await client.from('profiles').upsert({
+            'id': client.auth.currentUser!.id,
+            'pseudo': chosenPseudo,
+          });
+        } on PostgrestException catch (pe) {
+          if (pe.code == '23505') throw _FormError('Ce pseudo est déjà pris.');
+        }
+        return;
+      }
+      throw _FormError('Inscription impossible. Réessaie.');
+    }
+  }
+
   Future<void> submit() async {
+    final mail = loginEmail(identifier.text);
+    if (mail == null) {
+      setState(() => message =
+          'Entre un e-mail valide, ou un numéro avec indicatif (ex : +229 01 97 00 00 00).');
+      return;
+    }
+    final chosenPseudo = pseudo.text.trim();
+    if (signup &&
+        !RegExp(r'^[\p{L}\p{N}_.\- ]{3,30}$', unicode: true)
+            .hasMatch(chosenPseudo)) {
+      setState(() => message =
+          'Choisis un pseudo de 3 à 30 caractères (lettres, chiffres, . _ -).');
+      return;
+    }
+
     setState(() {
       loading = true;
       message = '';
@@ -40,15 +121,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       final auth = Supabase.instance.client.auth;
-      final mail = email.text.trim();
-
-      if (signup) {
-        await auth.signUp(email: mail, password: password.text);
-        // Le compte est confirmé automatiquement : on connecte tout de suite.
-        if (auth.currentSession == null) {
-          await auth.signInWithPassword(email: mail, password: password.text);
-        }
-      } else {
+      if (signup) await register(mail, chosenPseudo);
+      if (auth.currentSession == null) {
         await auth.signInWithPassword(email: mail, password: password.text);
       }
 
@@ -61,6 +135,8 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         setState(() => message = 'Connexion impossible. Réessaie.');
       }
+    } on _FormError catch (e) {
+      setState(() => message = e.text);
     } on AuthException catch (e) {
       setState(() => message = friendly(e.message));
     } catch (_) {
@@ -73,7 +149,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
-    email.dispose();
+    pseudo.dispose();
+    identifier.dispose();
     password.dispose();
     super.dispose();
   }
@@ -121,12 +198,27 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  if (signup) ...[
+                    TextField(
+                      controller: pseudo,
+                      maxLength: 30,
+                      decoration: const InputDecoration(
+                        hintText: 'Pseudo',
+                        counterText: '',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
-                    controller: email,
+                    controller: identifier,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      hintText: 'Adresse e-mail',
-                      prefixIcon: Icon(Icons.mail_outline),
+                    decoration: InputDecoration(
+                      hintText: 'E-mail ou numéro de téléphone',
+                      helperText: signup
+                          ? 'Numéro avec indicatif, ex : +229 01 97 00 00 00'
+                          : null,
+                      prefixIcon: const Icon(Icons.alternate_email),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -209,4 +301,9 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
     );
   }
+}
+
+class _FormError implements Exception {
+  _FormError(this.text);
+  final String text;
 }

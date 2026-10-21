@@ -20,7 +20,7 @@ class _NearbyMessage {
   final String? text;
   final String? filePath;
   final bool mine;
-  final DateTime at = DateTime.now();
+  final DateTime at;
 
   _NearbyMessage({
     required this.id,
@@ -28,7 +28,26 @@ class _NearbyMessage {
     required this.mine,
     this.text,
     this.filePath,
-  });
+    DateTime? at,
+  }) : at = at ?? DateTime.now();
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'from': from,
+        'text': text,
+        'filePath': filePath,
+        'mine': mine,
+        'at': at.toIso8601String(),
+      };
+
+  factory _NearbyMessage.fromJson(Map<String, dynamic> j) => _NearbyMessage(
+        id: j['id'].toString(),
+        from: j['from'].toString(),
+        text: j['text']?.toString(),
+        filePath: j['filePath']?.toString(),
+        mine: j['mine'] == true,
+        at: DateTime.tryParse(j['at']?.toString() ?? ''),
+      );
 }
 
 /// Mode proche : messagerie sans internet entre téléphones (Bluetooth / Wi-Fi
@@ -61,6 +80,75 @@ class _NearbyScreenState extends State<NearbyScreen> {
   final fileSenders = <int, String>{}; // payloadId -> endpointId
   final fileNames = <int, String>{}; // payloadId -> nom du fichier
   final doneFiles = <int>{};
+
+  // ---------- Historique enregistré sur le téléphone ----------
+  Future<File> historyFile() async {
+    final dir = await getApplicationSupportDirectory();
+    await dir.create(recursive: true);
+    return File('${dir.path}/nearby_history.json');
+  }
+
+  Future<void> loadHistory() async {
+    try {
+      final f = await historyFile();
+      if (!await f.exists()) return;
+      final list = jsonDecode(await f.readAsString()) as List;
+      final loaded = list
+          .map((e) => _NearbyMessage.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        messages.insertAll(0, loaded);
+        seen.addAll(loaded.map((m) => m.id));
+      });
+    } catch (_) {}
+  }
+
+  Future<void> saveHistory() async {
+    try {
+      final f = await historyFile();
+      final last = messages.length > 500
+          ? messages.sublist(messages.length - 500)
+          : messages;
+      await f.writeAsString(jsonEncode(last.map((m) => m.toJson()).toList()));
+    } catch (_) {}
+  }
+
+  void remember(_NearbyMessage m) {
+    messages.add(m);
+    saveHistory();
+  }
+
+  Future<void> clearHistory() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Effacer l\'historique ?'),
+        content: const Text(
+            'Les messages du Mode proche seront supprimés de ce téléphone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Effacer'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    messages.clear();
+    await saveHistory();
+    refresh();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadHistory();
+  }
 
   String shortName(String unique) {
     final i = unique.lastIndexOf('#');
@@ -217,7 +305,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
       final data = jsonDecode(raw) as Map<String, dynamic>;
       final id = data['id'].toString();
       if (!seen.add(id)) return; // déjà reçu : on évite les boucles
-      messages.add(_NearbyMessage(
+      remember(_NearbyMessage(
         id: id,
         from: shortName(data['from'].toString()),
         text: data['text']?.toString(),
@@ -256,7 +344,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
     }
     if (!ok) return;
 
-    messages.add(_NearbyMessage(
+    remember(_NearbyMessage(
       id: 'file-$pid-${DateTime.now().microsecondsSinceEpoch}',
       from: shortName(endpointNames[sender] ?? 'Inconnu'),
       filePath: dest,
@@ -289,7 +377,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
       'text': text.length > 2000 ? text.substring(0, 2000) : text,
     })));
     broadcast(bytes);
-    messages.add(_NearbyMessage(
+    remember(_NearbyMessage(
       id: id,
       from: 'Moi',
       text: text,
@@ -319,10 +407,18 @@ class _NearbyScreenState extends State<NearbyScreen> {
           Uint8List.fromList(utf8.encode('$pid:$fileName')),
         );
       }
-      messages.add(_NearbyMessage(
+      var saved = file.path;
+      try {
+        final dir = await getApplicationDocumentsDirectory();
+        saved = '${dir.path}/${DateTime.now().millisecondsSinceEpoch}_$fileName';
+        await File(file.path).copy(saved);
+      } catch (_) {
+        saved = file.path;
+      }
+      remember(_NearbyMessage(
         id: 'mine-${DateTime.now().microsecondsSinceEpoch}',
         from: 'Moi',
-        filePath: file.path,
+        filePath: saved,
         mine: true,
       ));
       refresh();
@@ -348,7 +444,17 @@ class _NearbyScreenState extends State<NearbyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Mode proche')),
+      appBar: AppBar(
+        title: const Text('Mode proche'),
+        actions: [
+          if (messages.isNotEmpty)
+            IconButton(
+              tooltip: 'Effacer l\'historique',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: clearHistory,
+            ),
+        ],
+      ),
       body: started ? chatBody() : welcomeBody(),
     );
   }
