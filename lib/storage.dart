@@ -13,37 +13,35 @@ Future<File> _file(String name) async {
   return File('${dir.path}/$name');
 }
 
-Future<void> _noop() async {}
-
-Future<bool> _hasSession() async {
-  final f = await _file('supabase_session.json');
-  return f.exists();
-}
-
-Future<String?> _readSession() async {
-  final f = await _file('supabase_session.json');
-  return await f.exists() ? f.readAsString() : null;
-}
-
-Future<void> _removeSession() async {
-  final f = await _file('supabase_session.json');
-  if (await f.exists()) await f.delete();
-}
-
-Future<void> _saveSession(String value) async {
-  final f = await _file('supabase_session.json');
-  await f.writeAsString(value);
-}
-
 class FileLocalStorage extends LocalStorage {
-  const FileLocalStorage()
-      : super(
-          initialize: _noop,
-          hasAccessToken: _hasSession,
-          accessToken: _readSession,
-          removePersistedSession: _removeSession,
-          persistSession: _saveSession,
-        );
+  const FileLocalStorage();
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<bool> hasAccessToken() async {
+    final f = await _file('supabase_session.json');
+    return f.exists();
+  }
+
+  @override
+  Future<String?> accessToken() async {
+    final f = await _file('supabase_session.json');
+    return await f.exists() ? f.readAsString() : null;
+  }
+
+  @override
+  Future<void> removePersistedSession() async {
+    final f = await _file('supabase_session.json');
+    if (await f.exists()) await f.delete();
+  }
+
+  @override
+  Future<void> persistSession(String persistSessionString) async {
+    final f = await _file('supabase_session.json');
+    await f.writeAsString(persistSessionString);
+  }
 }
 
 class FileAsyncStorage extends GotrueAsyncStorage {
