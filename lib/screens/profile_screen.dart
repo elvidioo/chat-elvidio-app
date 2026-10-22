@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../theme.dart';
+import '../updater.dart';
 import '../widgets.dart';
 import 'auth_screen.dart';
 
@@ -173,6 +174,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         'Se déconnecter',
                         style: TextStyle(color: Colors.redAccent),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Text(
+                        'Version ${currentBuild == 0 ? 'développement' : currentBuild}',
+                        style: const TextStyle(color: AppColors.muted),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => checkAndPrompt(context),
+                      icon: const Icon(Icons.system_update),
+                      label: const Text('Rechercher une mise à jour'),
                     ),
                   ],
                 ],

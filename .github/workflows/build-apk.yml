@@ -31,7 +31,7 @@ jobs:
           from pathlib import Path
           perms = ["INTERNET", "ACCESS_WIFI_STATE", "CHANGE_WIFI_STATE", "BLUETOOTH", "BLUETOOTH_ADMIN",
                    "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "BLUETOOTH_ADVERTISE",
-                   "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN", "NEARBY_WIFI_DEVICES"]
+                   "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN", "NEARBY_WIFI_DEVICES", "REQUEST_INSTALL_PACKAGES"]
           mf = Path("android/app/src/main/AndroidManifest.xml")
           x = mf.read_text()
           lines = "".join('    <uses-permission android:name="android.permission.%s"/>\n' % p for p in perms)
@@ -128,7 +128,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -o pipefail
-          flutter build apk --release --no-shrink --build-number=${{ github.run_number }} --target-platform android-arm,android-arm64 --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build.log
+          flutter build apk --release --no-shrink --build-number=${{ github.run_number }} --dart-define=BUILD_NUMBER=${{ github.run_number }} --target-platform android-arm,android-arm64 --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build.log
 
       - name: Afficher les erreurs de compilation
         if: failure()

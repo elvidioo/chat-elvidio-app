@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../updater.dart';
 import 'chats_tab.dart';
 import 'nearby_screen.dart';
 import 'profile_screen.dart';
@@ -21,7 +22,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => ensureProfile());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ensureProfile();
+      if (mounted) checkAndPrompt(context, silent: true);
+    });
   }
 
   // Un nouveau compte doit choisir un pseudo pour apparaître chez les autres.
