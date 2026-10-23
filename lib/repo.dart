@@ -82,7 +82,11 @@ class Repo {
   }
 
   /// À appeler après la connexion et à chaque retour dans l'app.
-  Future<void> start() async {
+  Future<void>? _ready;
+
+  Future<void> start() => _ready = _start();
+
+  Future<void> _start() async {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) return;
     if (_uid != uid) {
@@ -153,13 +157,17 @@ class Repo {
 
   /// Contacts : depuis le serveur, sinon la copie enregistrée.
   Future<List<Map<String, dynamic>>> loadProfiles() async {
+    try {
+      await _ready;
+    } catch (_) {}
     final uid = _db.auth.currentUser?.id;
     try {
       final data = await _db
           .from('profiles')
           .select('id, pseudo')
           .neq('id', uid ?? '')
-          .order('pseudo');
+          .order('pseudo')
+          .timeout(const Duration(seconds: 6));
       profiles = List<Map<String, dynamic>>.from(data);
       for (final p in profiles) {
         names[p['id'].toString()] = p['pseudo']?.toString() ?? '';
