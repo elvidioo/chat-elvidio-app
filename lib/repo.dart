@@ -100,6 +100,19 @@ class Repo {
       await _loadCache(uid);
     }
     _subscribe();
+    _refreshProfiles();
+    _profTimer?.cancel();
+    _profTimer = Timer.periodic(
+        const Duration(seconds: 40), (_) => _refreshProfiles());
+  }
+
+  Timer? _profTimer;
+
+  /// Recharge les contacts (photos de profil, nouveaux inscrits) en silence.
+  Future<void> _refreshProfiles() async {
+    try {
+      await loadProfiles();
+    } catch (_) {}
   }
 
   void _subscribe() {
@@ -196,6 +209,7 @@ class Repo {
   /// À la déconnexion : on arrête tout et on efface la copie locale.
   Future<void> stop() async {
     _retry?.cancel();
+    _profTimer?.cancel();
     _saveTimer?.cancel();
     await _sub?.cancel();
     _sub = null;
