@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -272,12 +272,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> sendDocument() async {
     if (sending) return;
     try {
-      final res = await FilePicker.platform.pickFiles();
-      final path = res?.files.single.path;
-      if (path == null) return;
+      final picked = await openFile();
+      if (picked == null) return;
       setState(() => sending = true);
-      final f = File(path);
-      await uploadAndSend(await f.readAsBytes(), res!.files.single.name);
+      await uploadAndSend(await picked.readAsBytes(), picked.name);
     } catch (_) {
       toast('Envoi du document impossible. Réessaie.');
     } finally {
