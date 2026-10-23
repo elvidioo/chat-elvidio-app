@@ -182,7 +182,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void toast(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    final t = text.length > 180 ? text.substring(0, 180) : text;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
   }
 
   Future<void> sendMessage() async {
@@ -262,8 +263,8 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() => sending = true);
       await uploadAndSend(await file.readAsBytes(), file.name,
           contentType: file.mimeType);
-    } catch (_) {
-      toast('Envoi du fichier impossible. Réessaie.');
+    } catch (e) {
+      toast('Envoi du fichier impossible. Réessaie. ($e)');
     } finally {
       if (mounted) setState(() => sending = false);
     }
@@ -276,8 +277,8 @@ class _ChatScreenState extends State<ChatScreen> {
       if (picked == null) return;
       setState(() => sending = true);
       await uploadAndSend(await picked.readAsBytes(), picked.name);
-    } catch (_) {
-      toast('Envoi du document impossible. Réessaie.');
+    } catch (e) {
+      toast('Envoi du document impossible. Réessaie. ($e)');
     } finally {
       if (mounted) setState(() => sending = false);
     }
@@ -305,8 +306,8 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) setState(() => recSeconds++);
       });
       setState(() => recording = true);
-    } catch (_) {
-      toast('Impossible de démarrer l\'enregistrement.');
+    } catch (e) {
+      toast('Enregistrement impossible : $e');
     }
   }
 
@@ -322,8 +323,8 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() => sending = true);
       final bytes = await File(path).readAsBytes();
       await uploadAndSend(bytes, 'vocal.m4a', contentType: 'audio/mp4');
-    } catch (_) {
-      toast('Envoi du vocal impossible. Réessaie.');
+    } catch (e) {
+      toast('Envoi du vocal impossible. Réessaie. ($e)');
     } finally {
       if (mounted) setState(() => sending = false);
     }

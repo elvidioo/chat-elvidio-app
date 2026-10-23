@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../notifications.dart';
 import '../settings.dart';
 import '../theme.dart';
+import '../presence.dart';
 import '../updater.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -80,6 +81,13 @@ class SettingsScreen extends StatelessWidget {
             trailing: Text(
               currentBuild == 0 ? 'développement' : '$currentBuild',
               style: TextStyle(color: AppColors.muted),
+            ),
+          ),
+          ValueListenableBuilder<String>(
+            valueListenable: LivePresence.I.status,
+            builder: (context, v, _) => ListTile(
+              title: const Text('Connexion temps réel'),
+              subtitle: Text(v),
             ),
           ),
           ListTile(

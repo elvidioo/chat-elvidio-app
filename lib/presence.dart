@@ -18,16 +18,23 @@ class LivePresence {
   final ValueNotifier<Map<String, String>> avatars =
       ValueNotifier<Map<String, String>>({});
 
+  /// Etat de la connexion temps réel (affiché dans Paramètres).
+  final ValueNotifier<String> status = ValueNotifier<String>('non connecté');
+
   RealtimeChannel? _ch;
   String? _uid;
   String? _typingTo;
   Timer? _typingReset;
 
   void setAvatars(Iterable<Map<String, dynamic>> profiles) {
-    final m = <String, String>{};
+    final m = <String, String>{...avatars.value};
     for (final p in profiles) {
       final u = p['avatar_url']?.toString() ?? '';
-      if (u.isNotEmpty) m[p['id'].toString()] = u;
+      if (u.isNotEmpty) {
+        m[p['id'].toString()] = u;
+      } else {
+        m.remove(p['id'].toString());
+      }
     }
     avatars.value = m;
   }
@@ -57,8 +64,9 @@ class LivePresence {
       on.remove(uid);
       online.value = on;
       typingToMe.value = typing;
-    }).subscribe((status, [error]) async {
-      if (status == RealtimeSubscribeStatus.subscribed) {
+    }).subscribe((st, [error]) async {
+      this.status.value = error == null ? st.name : '${st.name}: $error';
+      if (st == RealtimeSubscribeStatus.subscribed) {
         await ch.track({'typing_to': _typingTo});
       }
     });

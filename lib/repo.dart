@@ -172,6 +172,16 @@ class Repo {
           .timeout(const Duration(seconds: 6));
       profiles = List<Map<String, dynamic>>.from(data);
       LivePresence.I.setAvatars(profiles);
+      if (uid != null) {
+        try {
+          final me = await _db
+              .from('profiles')
+              .select('id, avatar_url')
+              .eq('id', uid)
+              .maybeSingle();
+          if (me != null) LivePresence.I.setAvatars([me]);
+        } catch (_) {}
+      }
       for (final p in profiles) {
         names[p['id'].toString()] = p['pseudo']?.toString() ?? '';
       }
