@@ -6,6 +6,7 @@ import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'chat_screen.dart';
+import 'friends_screen.dart';
 
 /// Onglet "Discussions" façon Messenger : contacts en haut, puis les
 /// conversations avec l'aperçu du dernier message.
@@ -49,6 +50,14 @@ class _ChatsTabState extends State<ChatsTab> {
     super.dispose();
   }
 
+  Future<void> openFriends() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FriendsScreen()),
+    );
+    if (mounted) setState(() => profiles = Repo.I.loadProfiles());
+  }
+
   void openChat(String id, String name) {
     Navigator.push(
       context,
@@ -90,6 +99,18 @@ class _ChatsTabState extends State<ChatsTab> {
             child: Text(
               'Discussions',
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+            ),
+          ),
+          ValueListenableBuilder<int>(
+            valueListenable: Repo.I.pendingCount,
+            builder: (context, n, _) => IconButton(
+              tooltip: 'Amis',
+              onPressed: openFriends,
+              icon: Badge(
+                isLabelVisible: n > 0,
+                label: Text('$n'),
+                child: const Icon(Icons.person_add_alt_1),
+              ),
             ),
           ),
         ],
@@ -282,8 +303,8 @@ class _ChatsTabState extends State<ChatsTab> {
       children.add(all.isEmpty
           ? message(
               Icons.people_outline,
-              'Personne d\'autre pour le moment',
-              'Invite tes amis à installer l\'app,\nils apparaîtront ici.',
+              'Aucun ami pour le moment',
+              'Touche l\'icône d\'ajout en haut à droite\npour chercher des amis par pseudo.',
             )
           : message(Icons.search_off, 'Aucun résultat', 'Essaie un autre nom.'));
     } else {

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../theme.dart';
 import '../widgets.dart';
+import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 import 'nearby_screen.dart';
 
@@ -100,9 +101,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> submit() async {
     final mail = loginEmail(identifier.text);
-    if (mail == null) {
-      setState(() => message =
-          'Entre un e-mail valide, ou un numéro avec indicatif (ex : +229 01 97 00 00 00).');
+    if (mail == null || (signup && !identifier.text.contains('@'))) {
+      setState(() => message = 'Entre une adresse e-mail valide.');
       return;
     }
     final chosenPseudo = pseudo.text.trim();
@@ -214,10 +214,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: identifier,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
-                      hintText: 'E-mail ou numéro de téléphone',
-                      helperText: signup
-                          ? 'Numéro avec indicatif, ex : +229 01 97 00 00 00'
-                          : null,
+                      hintText: 'E-mail',
                       prefixIcon: const Icon(Icons.alternate_email),
                     ),
                   ),
@@ -238,6 +235,21 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     onSubmitted: (_) => loading ? null : submit(),
                   ),
+                  if (!signup)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ForgotPasswordScreen(
+                              initialEmail: identifier.text.trim(),
+                            ),
+                          ),
+                        ),
+                        child: const Text('Mot de passe oublié ?'),
+                      ),
+                    ),
                   if (message.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 12),

@@ -1,4 +1,6 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'presence.dart';
 import 'theme.dart';
@@ -344,13 +346,14 @@ class ChatBubble extends StatelessWidget {
                 child: media,
               ),
             if (hasText)
-              Text(
+              LinkText(
                 text!,
                 style: TextStyle(
                   fontSize: 15.5,
                   height: 1.3,
                   color: mine ? Colors.white : AppColors.text,
                 ),
+                linkColor: mine ? Colors.white : AppColors.primary,
               ),
             if (time != null && time!.isNotEmpty)
               Align(
@@ -605,5 +608,75 @@ class _RadarPulseState extends State<RadarPulse>
         },
       ),
     );
+  }
+}
+
+
+/// Texte dont les liens (http, https, www) sont cliquables.
+class LinkText extends StatefulWidget {
+  const LinkText(this.text, {super.key, required this.style, required this.linkColor});
+
+  final String text;
+  final TextStyle style;
+  final Color linkColor;
+
+  @override
+  State<LinkText> createState() => _LinkTextState();
+}
+
+class _LinkTextState extends State<LinkText> {
+  final List<TapGestureRecognizer> _taps = [];
+
+  void _disposeTaps() {
+    for (final t in _taps) {
+      t.dispose();
+    }
+    _taps.clear();
+  }
+
+  @override
+  void dispose() {
+    _disposeTaps();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _disposeTaps();
+    final re = RegExp(r'((https?://|www\.)[^\s]+)', caseSensitive: false);
+    final spans = <InlineSpan>[];
+    var last = 0;
+    for (final m in re.allMatches(widget.text)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: widget.text.substring(last, m.start)));
+      }
+      var link = m.group(0)!;
+      // ponctuation finale qui ne fait pas partie du lien
+      var trail = '';
+      while (link.isNotEmpty && '.,;:!?)'.contains(link[link.length - 1])) {
+        trail = link[link.length - 1] + trail;
+        link = link.substring(0, link.length - 1);
+      }
+      final url = link.toLowerCase().startsWith('www.') ? 'https://$link' : link;
+      final tap = TapGestureRecognizer()
+        ..onTap = () {
+          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        };
+      _taps.add(tap);
+      spans.add(TextSpan(
+        text: link,
+        style: TextStyle(
+          color: widget.linkColor,
+          decoration: TextDecoration.underline,
+        ),
+        recognizer: tap,
+      ));
+      if (trail.isNotEmpty) spans.add(TextSpan(text: trail));
+      last = m.end;
+    }
+    if (last < widget.text.length) {
+      spans.add(TextSpan(text: widget.text.substring(last)));
+    }
+    return Text.rich(TextSpan(children: spans), style: widget.style);
   }
 }

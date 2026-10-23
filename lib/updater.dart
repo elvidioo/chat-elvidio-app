@@ -7,6 +7,11 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+/// Téléphones 64 bits : petit APK arm64. Anciens téléphones 32 bits : arm32.
+final String _apkName = Platform.version.contains('arm64') || Platform.version.contains('x64')
+    ? 'chat-elvidio.apk'
+    : 'chat-elvidio-arm32.apk';
+
 /// Numéro de version de cette installation (donné par le build GitHub).
 const currentBuild = int.fromEnvironment('BUILD_NUMBER', defaultValue: 0);
 
@@ -42,7 +47,7 @@ Future<UpdateInfo?> checkForUpdate() async {
     if (build == null || build <= currentBuild) return null;
 
     for (final asset in (data['assets'] as List)) {
-      if (asset['name'] == 'chat-elvidio.apk') {
+      if (asset['name'] == _apkName) {
         return UpdateInfo(
           build: build,
           url: asset['browser_download_url'].toString(),

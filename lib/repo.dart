@@ -22,6 +22,9 @@ class Repo {
       ValueNotifier<List<Map<String, dynamic>>>(<Map<String, dynamic>>[]);
 
   List<Map<String, dynamic>> profiles = [];
+
+  /// Demandes d'amis reçues, en attente.
+  final ValueNotifier<int> pendingCount = ValueNotifier<int>(0);
   final Map<String, String> names = {};
 
   /// Conversation actuellement ouverte (pas de notification pour elle).
@@ -177,12 +180,30 @@ class Repo {
     } catch (_) {}
     final uid = _db.auth.currentUser?.id;
     try {
-      final data = await _db
-          .from('profiles')
-          .select('id, pseudo, avatar_url')
-          .neq('id', uid ?? '')
-          .order('pseudo')
+      final fr = await _db
+          .from('friendships')
+          .select('requester, addressee, status')
           .timeout(const Duration(seconds: 6));
+      final peers = <String>{};
+      var pending = 0;
+      for (final f in fr) {
+        final other =
+            (f['requester'] == uid ? f['addressee'] : f['requester']).toString();
+        if (f['status'] == 'accepted') {
+          peers.add(other);
+        } else if (f['addressee'] == uid) {
+          pending++;
+        }
+      }
+      pendingCount.value = pending;
+      final data = peers.isEmpty
+          ? <dynamic>[]
+          : await _db
+              .from('profiles')
+              .select('id, pseudo, avatar_url')
+              .inFilter('id', peers.toList())
+              .order('pseudo')
+              .timeout(const Duration(seconds: 6));
       profiles = List<Map<String, dynamic>>.from(data);
       LivePresence.I.setAvatars(profiles);
       if (uid != null) {

@@ -7,6 +7,7 @@ import '../repo.dart';
 import '../settings.dart';
 import '../updater.dart';
 import 'chats_tab.dart';
+import 'feed_tab.dart';
 import 'nearby_screen.dart';
 import 'profile_screen.dart';
 
@@ -79,8 +80,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           ChatsTab(
             key: ValueKey('chats$version'),
-            onOpenProfile: () => setState(() => index = 2),
+            onOpenProfile: () => setState(() => index = 3),
           ),
+          const FeedTab(),
           const NearbyScreen(),
           ProfileScreen(
             key: ValueKey('profile$version'),
@@ -97,6 +99,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: Icon(Icons.chat_bubble_outline),
             selectedIcon: Icon(Icons.chat_bubble),
             label: 'Discussions',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.dynamic_feed_outlined),
+            selectedIcon: Icon(Icons.dynamic_feed),
+            label: 'Fil',
           ),
           NavigationDestination(
             icon: Icon(Icons.wifi_tethering),
