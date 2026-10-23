@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'chat_screen.dart';
@@ -20,21 +21,9 @@ class _ChatsTabState extends State<ChatsTab> {
   final supabase = Supabase.instance.client;
   final search = TextEditingController();
   late final String uid = supabase.auth.currentUser!.id;
-  late Future<List<Map<String, dynamic>>> profiles = loadProfiles();
-  late final Stream<List<Map<String, dynamic>>> messages = supabase
-      .from('messages')
-      .stream(primaryKey: ['id']).order('created_at', ascending: false);
+  late Future<List<Map<String, dynamic>>> profiles = Repo.I.loadProfiles();
   String query = '';
   String? myPseudo;
-
-  Future<List<Map<String, dynamic>>> loadProfiles() async {
-    final data = await supabase
-        .from('profiles')
-        .select('id, pseudo')
-        .neq('id', uid)
-        .order('pseudo');
-    return List<Map<String, dynamic>>.from(data);
-  }
 
   Future<void> loadMe() async {
     try {
@@ -113,7 +102,7 @@ class _ChatsTabState extends State<ChatsTab> {
       child: TextField(
         controller: search,
         onChanged: (v) => setState(() => query = v.trim().toLowerCase()),
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           hintText: 'Rechercher',
           prefixIcon: Icon(Icons.search, color: AppColors.muted),
           isDense: true,
@@ -158,6 +147,8 @@ class _ChatsTabState extends State<ChatsTab> {
 
   Widget tile(Map<String, dynamic> profile, Map<String, dynamic>? last) {
     final name = profile['pseudo']?.toString() ?? 'Utilisateur';
+    final unread =
+        last != null && last['sender'] != uid && last['read_at'] == null;
     return InkWell(
       onTap: () => openChat(profile['id'].toString(), name),
       child: Padding(
@@ -181,7 +172,7 @@ class _ChatsTabState extends State<ChatsTab> {
                   ),
                   const SizedBox(height: 2),
                   if (last == null)
-                    const Text(
+                    Text(
                       'Dis bonjour \u{1F44B}',
                       style: TextStyle(color: AppColors.muted),
                     )
@@ -193,18 +184,32 @@ class _ChatsTabState extends State<ChatsTab> {
                             preview(last),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppColors.muted),
+                            style: TextStyle(
+                              color: unread ? AppColors.text : AppColors.muted,
+                              fontWeight:
+                                  unread ? FontWeight.w700 : FontWeight.w400,
+                            ),
                           ),
                         ),
                         Text(
                           ' · ${formatListTime(created(last))}',
-                          style: const TextStyle(color: AppColors.muted),
+                          style: TextStyle(color: AppColors.muted),
                         ),
                       ],
                     ),
                 ],
               ),
             ),
+            if (unread)
+              Container(
+                width: 12,
+                height: 12,
+                margin: const EdgeInsets.only(left: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
           ],
         ),
       ),
@@ -227,7 +232,7 @@ class _ChatsTabState extends State<ChatsTab> {
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: AppColors.muted),
+            style: TextStyle(color: AppColors.muted),
           ),
           if (onRetry != null)
             TextButton(onPressed: onRetry, child: const Text('Réessayer')),
@@ -292,7 +297,7 @@ class _ChatsTabState extends State<ChatsTab> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                setState(() => profiles = loadProfiles());
+                setState(() => profiles = Repo.I.loadProfiles());
                 await profiles;
               },
               child: FutureBuilder<List<Map<String, dynamic>>>(
@@ -305,17 +310,16 @@ class _ChatsTabState extends State<ChatsTab> {
                         'Pas de connexion',
                         'Impossible de charger les contacts.\nTu peux utiliser le Mode proche.',
                         onRetry: () =>
-                            setState(() => profiles = loadProfiles()),
+                            setState(() => profiles = Repo.I.loadProfiles()),
                       ),
                     ]);
                   }
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  return StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: messages,
-                    builder: (context, msgs) =>
-                        body(snapshot.data!, msgs.data ?? const []),
+                  return ValueListenableBuilder<List<Map<String, dynamic>>>(
+                    valueListenable: Repo.I.messages,
+                    builder: (context, msgs, _) => body(snapshot.data!, msgs),
                   );
                 },
               ),

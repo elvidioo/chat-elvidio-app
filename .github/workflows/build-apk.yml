@@ -31,7 +31,7 @@ jobs:
           from pathlib import Path
           perms = ["INTERNET", "ACCESS_WIFI_STATE", "CHANGE_WIFI_STATE", "BLUETOOTH", "BLUETOOTH_ADMIN",
                    "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "BLUETOOTH_ADVERTISE",
-                   "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN", "NEARBY_WIFI_DEVICES", "REQUEST_INSTALL_PACKAGES"]
+                   "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN", "NEARBY_WIFI_DEVICES", "REQUEST_INSTALL_PACKAGES", "POST_NOTIFICATIONS"]
           mf = Path("android/app/src/main/AndroidManifest.xml")
           x = mf.read_text()
           lines = "".join('    <uses-permission android:name="android.permission.%s"/>\n' % p for p in perms)
@@ -42,6 +42,14 @@ jobs:
               if f.exists():
                   g = f.read_text()
                   g = re.sub(r"minSdk(Version)?\s*=?\s*flutter\.minSdkVersion", "minSdk = 23", g)
+                  if name.endswith(".kts"):
+                      if "isCoreLibraryDesugaringEnabled" not in g:
+                          g = g.replace("compileOptions {", "compileOptions {\n        isCoreLibraryDesugaringEnabled = true", 1)
+                          g += '\ndependencies {\n    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n}\n'
+                  else:
+                      if "coreLibraryDesugaringEnabled" not in g:
+                          g = g.replace("compileOptions {", "compileOptions {\n        coreLibraryDesugaringEnabled true", 1)
+                          g += '\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"\n}\n'
                   f.write_text(g)
           PY
 

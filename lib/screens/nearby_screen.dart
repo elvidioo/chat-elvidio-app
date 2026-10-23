@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:path_provider/path_provider.dart';
@@ -475,7 +476,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
                   style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Discute avec les téléphones proches, sans internet. '
                   'Les autres doivent ouvrir le Mode proche aussi.',
                   textAlign: TextAlign.center,
@@ -505,19 +506,19 @@ class _NearbyScreenState extends State<NearbyScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(bottom: BorderSide(color: AppColors.surface2)),
       ),
       child: peers.isEmpty
           ? Row(
               children: [
-                const Icon(Icons.radar, size: 18, color: AppColors.muted),
+                Icon(Icons.radar, size: 18, color: AppColors.muted),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     statusText,
-                    style: const TextStyle(color: AppColors.muted),
+                    style: TextStyle(color: AppColors.muted),
                   ),
                 ),
                 if (failed)
@@ -557,7 +558,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (failed)
-            const Icon(Icons.portable_wifi_off, size: 64, color: AppColors.muted)
+            Icon(Icons.portable_wifi_off, size: 64, color: AppColors.muted)
           else
             const RadarPulse(size: 170),
           const SizedBox(height: 16),
@@ -567,7 +568,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
                 : peers.isEmpty
                     ? 'Recherche de téléphones proches...'
                     : 'Connecté. Dis bonjour 👋',
-            style: const TextStyle(color: AppColors.muted),
+            style: TextStyle(color: AppColors.muted),
           ),
         ],
       ),
@@ -605,7 +606,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
   }
 
   Widget bubble(_NearbyMessage m) {
-    return ChatBubble(
+    final bubble = ChatBubble(
       mine: m.mine,
       sender: m.mine ? null : m.from,
       avatarName: m.mine ? null : m.from,
@@ -626,6 +627,16 @@ class _NearbyScreenState extends State<NearbyScreen> {
                 ),
               ),
             ),
+    );
+    final text = m.text;
+    if (text == null || text.isEmpty) return bubble;
+    return GestureDetector(
+      onLongPress: () {
+        Clipboard.setData(ClipboardData(text: text));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Message copié')));
+      },
+      child: bubble,
     );
   }
 }

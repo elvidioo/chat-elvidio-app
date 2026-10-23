@@ -86,7 +86,7 @@ class AppLogo extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: AppColors.gradient,
       ),
@@ -156,6 +156,10 @@ class ChatBubble extends StatelessWidget {
     this.text,
     this.time,
     this.avatarName,
+    this.quoteName,
+    this.quoteText,
+    this.status,
+    this.read = false,
     this.joinedAbove = false,
     this.joinedBelow = false,
   });
@@ -166,6 +170,10 @@ class ChatBubble extends StatelessWidget {
   final String? text;
   final String? time;
   final String? avatarName;
+  final String? quoteName;
+  final String? quoteText;
+  final String? status;
+  final bool read;
   final bool joinedAbove;
   final bool joinedBelow;
 
@@ -183,7 +191,8 @@ class ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasText = text != null && text!.isNotEmpty;
-    final onlyMedia = media != null && !hasText && sender == null;
+    final hasQuote = quoteText != null;
+    final onlyMedia = media != null && !hasText && sender == null && !hasQuote;
     final bigEmoji = hasText && media == null && text!.trim() == '\u{1F44D}';
     final reserveAvatar = !mine && avatarName != null;
     final showAvatar = reserveAvatar && !joinedBelow;
@@ -209,10 +218,63 @@ class ChatBubble extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 3),
                 child: Text(
                   sender!,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primary,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            if (hasQuote)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    color: mine ? Colors.white24 : Colors.black12,
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 3,
+                            color: mine ? Colors.white : AppColors.primary,
+                          ),
+                          Flexible(
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    quoteName ?? '',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: mine
+                                          ? Colors.white
+                                          : AppColors.primary,
+                                    ),
+                                  ),
+                                  Text(
+                                    quoteText!,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: mine
+                                          ? Colors.white70
+                                          : AppColors.muted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -266,7 +328,26 @@ class ChatBubble extends StatelessWidget {
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.72,
               ),
-              child: content,
+              child: Column(
+                crossAxisAlignment:
+                    mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  content,
+                  if (status != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2, right: 2),
+                      child: Text(
+                        status!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: read ? FontWeight.w700 : FontWeight.w400,
+                          color: read ? AppColors.primary : AppColors.muted,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ],
@@ -287,7 +368,7 @@ class TimeHeader extends StatelessWidget {
       child: Center(
         child: Text(
           formatHeaderTime(date),
-          style: const TextStyle(fontSize: 12, color: AppColors.muted),
+          style: TextStyle(fontSize: 12, color: AppColors.muted),
         ),
       ),
     );
@@ -439,7 +520,7 @@ class _RadarPulseState extends State<RadarPulse>
               Container(
                 width: size * 0.28,
                 height: size * 0.28,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: AppColors.gradient,
                 ),

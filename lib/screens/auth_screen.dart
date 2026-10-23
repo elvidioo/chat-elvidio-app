@@ -177,7 +177,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  const Text(
+                  Text(
                     'Discute. Partage. Même sans internet.',
                     style: TextStyle(color: AppColors.muted),
                   ),
@@ -266,7 +266,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: AppColors.surface2),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
                           Icon(Icons.wifi_tethering, color: AppColors.cyan),
                           SizedBox(width: 14),

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../repo.dart';
+import '../settings.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'video_screen.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({
@@ -27,10 +30,135 @@ class _ChatScreenState extends State<ChatScreen> {
   final picker = ImagePicker();
   final messageController = TextEditingController();
   late final String uid = supabase.auth.currentUser!.id;
-  late final Stream<List<Map<String, dynamic>>> stream = supabase
-      .from('messages')
-      .stream(primaryKey: ['id']).order('created_at', ascending: false);
   bool sending = false;
+  Map<String, dynamic>? replyTo;
+  int _lastMarked = -1;
+
+  @override
+  void initState() {
+    super.initState();
+    Repo.I.activePeer = widget.receiverId;
+    Repo.I.messages.addListener(markRead);
+    markRead();
+  }
+
+  /// Marque comme lus les messages reçus de ce contact (si l'option est active).
+  void markRead() {
+    if (!AppSettings.I.readReceipts.value) return;
+    final unread = Repo.I.messages.value
+        .where((m) =>
+            m['sender'] == widget.receiverId &&
+            m['receiver'] == uid &&
+            m['read_at'] == null)
+        .length;
+    if (unread == 0 || unread == _lastMarked) return;
+    _lastMarked = unread;
+    supabase
+        .rpc('mark_read', params: {'peer': widget.receiverId})
+        .then((_) {}, onError: (_) {
+      _lastMarked = -1;
+    });
+  }
+
+  Map<String, dynamic>? byId(dynamic id) {
+    if (id == null) return null;
+    for (final m in Repo.I.messages.value) {
+      if (m['id'] == id) return m;
+    }
+    return null;
+  }
+
+  String describe(Map<String, dynamic> m) {
+    final text = m['content']?.toString() ?? '';
+    if (text.isNotEmpty) return text;
+    final media = m['media_url']?.toString() ?? '';
+    if (media.isEmpty) return '';
+    return isVideoUrl(media) ? '\u{1F3A5} Vidéo' : '\u{1F4F7} Photo';
+  }
+
+  String nameOf(Map<String, dynamic> m) =>
+      m['sender'] == uid ? 'Vous' : widget.receiverName;
+
+  Map<String, dynamic> withReply(Map<String, dynamic> row) {
+    final r = replyTo;
+    if (r != null) row['reply_to'] = r['id'];
+    return row;
+  }
+
+  void messageActions(Map<String, dynamic> m) {
+    final text = m['content']?.toString() ?? '';
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: Icon(Icons.reply, color: AppColors.primary),
+              title: const Text('Répondre'),
+              onTap: () {
+                Navigator.pop(sheet);
+                setState(() => replyTo = m);
+              },
+            ),
+            if (text.isNotEmpty)
+              ListTile(
+                leading: Icon(Icons.copy, color: AppColors.primary),
+                title: const Text('Copier'),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  Clipboard.setData(ClipboardData(text: text));
+                  toast('Message copié');
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget replyBar() {
+    final r = replyTo;
+    if (r == null) return const SizedBox.shrink();
+    return Container(
+      color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+      child: Row(
+        children: [
+          Container(width: 3, height: 34, color: AppColors.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Réponse à ${nameOf(r)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+                Text(
+                  describe(r),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => setState(() => replyTo = null),
+          ),
+        ],
+      ),
+    );
+  }
 
   void toast(String text) {
     if (!mounted) return;
@@ -42,12 +170,13 @@ class _ChatScreenState extends State<ChatScreen> {
     if (content.isEmpty || sending) return;
     setState(() => sending = true);
     try {
-      await supabase.from('messages').insert({
+      await supabase.from('messages').insert(withReply({
         'sender': uid,
         'receiver': widget.receiverId,
         'content': content,
-      });
+      }));
       messageController.clear();
+      replyTo = null;
     } catch (_) {
       toast('Envoi impossible. Réessaie.');
     } finally {
@@ -59,11 +188,12 @@ class _ChatScreenState extends State<ChatScreen> {
     if (sending) return;
     setState(() => sending = true);
     try {
-      await supabase.from('messages').insert({
+      await supabase.from('messages').insert(withReply({
         'sender': uid,
         'receiver': widget.receiverId,
         'content': '\u{1F44D}',
-      });
+      }));
+      replyTo = null;
     } catch (_) {
       toast('Envoi impossible. Réessaie.');
     } finally {
@@ -102,11 +232,12 @@ class _ChatScreenState extends State<ChatScreen> {
           );
       final url = supabase.storage.from('media').getPublicUrl(path);
 
-      await supabase.from('messages').insert({
+      await supabase.from('messages').insert(withReply({
         'sender': uid,
         'receiver': widget.receiverId,
         'media_url': url,
-      });
+      }));
+      replyTo = null;
     } catch (_) {
       toast('Envoi du fichier impossible. Réessaie.');
     } finally {
@@ -125,7 +256,7 @@ class _ChatScreenState extends State<ChatScreen> {
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.photo, color: AppColors.cyan),
+              leading: Icon(Icons.photo, color: AppColors.cyan),
               title: const Text('Photo'),
               onTap: () {
                 Navigator.pop(sheet);
@@ -133,7 +264,7 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.videocam, color: AppColors.violet),
+              leading: Icon(Icons.videocam, color: AppColors.violet),
               title: const Text('Vidéo'),
               onTap: () {
                 Navigator.pop(sheet);
@@ -149,8 +280,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget mediaBubble(String url) {
     if (isVideoUrl(url)) {
       return GestureDetector(
-        onTap: () =>
-            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => VideoScreen(url: url)),
+        ),
         child: Container(
           width: 210,
           height: 120,
@@ -206,6 +339,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    Repo.I.activePeer = null;
+    Repo.I.messages.removeListener(markRead);
     messageController.dispose();
     super.dispose();
   }
@@ -240,7 +375,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
-        bottom: const PreferredSize(
+        bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1, color: AppColors.surface2),
         ),
@@ -248,23 +383,26 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<List<Map<String, dynamic>>>(
-              stream: stream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return const Center(child: Text('Erreur de chargement.'));
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            child: ValueListenableBuilder<List<Map<String, dynamic>>>(
+              valueListenable: Repo.I.messages,
+              builder: (context, all, _) {
                 // Du plus récent au plus ancien (liste inversée).
-                final messages = snapshot.data!
+                final lastMineIndexHolder = <int>[];
+                final messages = all
                     .where((m) =>
                         (m['sender'] == uid &&
                             m['receiver'] == widget.receiverId) ||
                         (m['sender'] == widget.receiverId &&
                             m['receiver'] == uid))
                     .toList();
+                for (var i = 0; i < messages.length; i++) {
+                  if (messages[i]['sender'] == uid) {
+                    lastMineIndexHolder.add(i);
+                    break;
+                  }
+                }
+                final lastMine =
+                    lastMineIndexHolder.isEmpty ? -1 : lastMineIndexHolder[0];
                 if (messages.isEmpty) {
                   return Center(
                     child: Column(
@@ -280,7 +418,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           'Dis bonjour \u{1F44B}',
                           style: TextStyle(color: AppColors.muted),
                         ),
@@ -305,20 +443,58 @@ class _ChatScreenState extends State<ChatScreen> {
                         (olderTime == null ||
                             time.difference(olderTime).inMinutes >= 30);
 
+                    final quoted = byId(item['reply_to']);
+                    final isMine = item['sender'] == uid;
+                    String? status;
+                    var isRead = false;
+                    if (isMine) {
+                      isRead = item['read_at'] != null &&
+                          AppSettings.I.readReceipts.value;
+                      status = isRead ? '\u2713\u2713' : '\u2713';
+                      if (index == lastMine) {
+                        status = isRead ? '\u2713\u2713 Vu' : '\u2713 Envoyé';
+                      }
+                    }
+
                     return Column(
                       children: [
                         if (showHeader) TimeHeader(time),
-                        ChatBubble(
-                          mine: item['sender'] == uid,
-                          text: item['content']?.toString(),
-                          media: (mediaUrl != null && mediaUrl.isNotEmpty)
-                              ? mediaBubble(mediaUrl)
-                              : null,
-                          avatarName: item['sender'] == uid
-                              ? null
-                              : widget.receiverName,
-                          joinedAbove: !showHeader && sameGroup(item, older),
-                          joinedBelow: sameGroup(item, newer),
+                        Dismissible(
+                          key: ValueKey('m${item['id']}'),
+                          direction: DismissDirection.startToEnd,
+                          confirmDismiss: (_) async {
+                            setState(() => replyTo = item);
+                            return false;
+                          },
+                          background: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 16),
+                              child: Icon(Icons.reply, color: AppColors.muted),
+                            ),
+                          ),
+                          child: GestureDetector(
+                            onLongPress: () => messageActions(item),
+                            child: ChatBubble(
+                              mine: isMine,
+                              text: item['content']?.toString(),
+                              media: (mediaUrl != null && mediaUrl.isNotEmpty)
+                                  ? mediaBubble(mediaUrl)
+                                  : null,
+                              avatarName: isMine ? null : widget.receiverName,
+                              quoteName: quoted == null ? null : nameOf(quoted),
+                              quoteText: quoted == null
+                                  ? (item['reply_to'] != null
+                                      ? 'Message indisponible'
+                                      : null)
+                                  : describe(quoted),
+                              status: status,
+                              read: isRead,
+                              joinedAbove:
+                                  !showHeader && sameGroup(item, older),
+                              joinedBelow: sameGroup(item, newer),
+                            ),
+                          ),
                         ),
                       ],
                     );
@@ -328,6 +504,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           if (sending) const LinearProgressIndicator(minHeight: 2),
+          replyBar(),
           Composer(
             controller: messageController,
             onSend: sendMessage,

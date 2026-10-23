@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../repo.dart';
 import '../theme.dart';
+import 'settings_screen.dart';
 import '../updater.dart';
 import '../widgets.dart';
 import 'auth_screen.dart';
@@ -109,6 +111,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
+    await Repo.I.stop();
     await _db.auth.signOut();
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
@@ -138,7 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? 'Choisis ton pseudo : c\'est le nom que verront tes amis.'
                         : 'Ton pseudo visible par les autres.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.muted),
+                    style: TextStyle(color: AppColors.muted),
                   ),
                   const SizedBox(height: 22),
                   TextField(
@@ -166,7 +169,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onPressed: _saveProfile,
                   ),
                   if (widget.showLogout) ...[
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 20),
+                    OutlinedButton.icon(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SettingsScreen(),
+                        ),
+                      ),
+                      icon: const Icon(Icons.settings),
+                      label: const Text('Paramètres'),
+                    ),
+                    const SizedBox(height: 8),
                     TextButton.icon(
                       onPressed: _logout,
                       icon: const Icon(Icons.logout, color: Colors.redAccent),
@@ -179,7 +193,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Center(
                       child: Text(
                         'Version ${currentBuild == 0 ? 'développement' : currentBuild}',
-                        style: const TextStyle(color: AppColors.muted),
+                        style: TextStyle(color: AppColors.muted),
                       ),
                     ),
                     TextButton.icon(

@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'notifications.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
+import 'settings.dart';
 import 'storage.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -22,7 +24,7 @@ const supabaseKey = _envKey == ''
     : _envKey;
 
 Future<void> main() async {
-  runZonedGuarded(() {
+  runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
     ErrorWidget.builder = (details) => Material(
           color: AppColors.bg,
@@ -37,26 +39,20 @@ Future<void> main() async {
             ),
           ),
         );
-    runApp(const BootApp());
+    await AppSettings.I.load();
+    await Notifier.init();
+    runApp(const RootApp());
   }, (error, stack) {
     debugPrint('Erreur non gérée : $error');
   });
 }
 
-/// Affiche tout de suite un écran de chargement, puis démarre Supabase.
-/// En cas de problème, l'erreur s'affiche au lieu d'un écran noir.
-class BootApp extends StatefulWidget {
-  const BootApp({super.key});
+/// Démarre Supabase une seule fois (même si l'écran est reconstruit).
+class Boot {
+  static Future<void>? _future;
 
-  @override
-  State<BootApp> createState() => _BootAppState();
-}
-
-class _BootAppState extends State<BootApp> {
-  late Future<void> boot = _boot();
-
-  Future<void> _boot() {
-    return Supabase.initialize(
+  static Future<void> ensure() {
+    return _future ??= Supabase.initialize(
       url: supabaseUrl,
       anonKey: supabaseKey,
       authOptions: const FlutterAuthClientOptions(
@@ -64,18 +60,92 @@ class _BootAppState extends State<BootApp> {
         localStorage: FileLocalStorage(),
         pkceAsyncStorage: FileAsyncStorage(),
       ),
-    )
-        .timeout(const Duration(seconds: 20))
-        .then((_) {});
+    ).timeout(const Duration(seconds: 20)).then((_) {});
   }
 
-  Widget _screen(Widget child) {
+  static void reset() => _future = null;
+}
+
+/// Racine de l'app : applique le thème (clair / sombre / système).
+class RootApp extends StatefulWidget {
+  const RootApp({super.key});
+
+  @override
+  State<RootApp> createState() => _RootAppState();
+}
+
+class _RootAppState extends State<RootApp> with WidgetsBindingObserver {
+  bool get dark {
+    switch (AppSettings.I.themeMode.value) {
+      case 'dark':
+        return true;
+      case 'light':
+        return false;
+      default:
+        return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+            Brightness.dark;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    AppSettings.I.themeMode.addListener(_themeChanged);
+  }
+
+  @override
+  void dispose() {
+    AppSettings.I.themeMode.removeListener(_themeChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() => _themeChanged();
+
+  // Les couleurs sont lues au moment de construire chaque widget : on
+  // reconstruit donc tout l'arbre quand le thème change.
+  void _themeChanged() {
+    AppColors.dark = dark;
+    if (!mounted) return;
+    setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      void rebuild(Element element) {
+        element.markNeedsBuild();
+        element.visitChildren(rebuild);
+      }
+
+      (context as Element).visitChildren(rebuild);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    AppColors.dark = dark;
     return MaterialApp(
+      title: 'Chat Elvidio',
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      home: Scaffold(body: Center(child: child)),
+      theme: buildTheme(AppColors.dark),
+      home: const BootGate(),
     );
   }
+}
+
+/// Écran de chargement, puis connexion ou accueil. Si le démarrage échoue,
+/// l'erreur s'affiche au lieu d'un écran noir.
+class BootGate extends StatefulWidget {
+  const BootGate({super.key});
+
+  @override
+  State<BootGate> createState() => _BootGateState();
+}
+
+class _BootGateState extends State<BootGate> {
+  late Future<void> boot = Boot.ensure();
+
+  Widget _center(Widget child) => Scaffold(body: Center(child: child));
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +153,7 @@ class _BootAppState extends State<BootApp> {
       future: boot,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _screen(Padding(
+          return _center(Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -98,11 +168,14 @@ class _BootAppState extends State<BootApp> {
                 Text(
                   '${snapshot.error}',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.muted),
+                  style: TextStyle(color: AppColors.muted),
                 ),
                 const SizedBox(height: 16),
                 TextButton(
-                  onPressed: () => setState(() => boot = _boot()),
+                  onPressed: () {
+                    Boot.reset();
+                    setState(() => boot = Boot.ensure());
+                  },
                   child: const Text('Réessayer'),
                 ),
               ],
@@ -110,7 +183,7 @@ class _BootAppState extends State<BootApp> {
           ));
         }
         if (snapshot.connectionState != ConnectionState.done) {
-          return _screen(const Column(
+          return _center(const Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               AppLogo(),
@@ -119,56 +192,11 @@ class _BootAppState extends State<BootApp> {
             ],
           ));
         }
-        return const ChatElvidioApp();
+        // La session est mémorisée : pas de reconnexion à chaque lancement.
+        return Supabase.instance.client.auth.currentSession != null
+            ? const HomeScreen()
+            : const AuthScreen();
       },
-    );
-  }
-}
-
-class SetupApp extends StatelessWidget {
-  const SetupApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      home: const Scaffold(
-        body: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppLogo(),
-                SizedBox(height: 20),
-                Text(
-                  'Configuration Supabase requise pour démarrer.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class ChatElvidioApp extends StatelessWidget {
-  const ChatElvidioApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // La session est mémorisée : pas besoin de se reconnecter à chaque fois
-    // (et ça marche même sans internet).
-    final loggedIn = Supabase.instance.client.auth.currentSession != null;
-    return MaterialApp(
-      title: 'Chat Elvidio',
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      home: loggedIn ? const HomeScreen() : const AuthScreen(),
     );
   }
 }

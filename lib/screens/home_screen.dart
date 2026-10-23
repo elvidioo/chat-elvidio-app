@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../notifications.dart';
+import '../repo.dart';
+import '../settings.dart';
 import '../updater.dart';
 import 'chats_tab.dart';
 import 'nearby_screen.dart';
@@ -14,7 +17,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final supabase = Supabase.instance.client;
   int index = 0;
   int version = 0; // change quand le profil est modifié, pour tout recharger
@@ -22,10 +25,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    Repo.I.start();
+    if (AppSettings.I.notifications.value) Notifier.requestPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ensureProfile();
       if (mounted) checkAndPrompt(context, silent: true);
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) Repo.I.start();
   }
 
   // Un nouveau compte doit choisir un pseudo pour apparaître chez les autres.
