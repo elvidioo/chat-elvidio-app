@@ -18,6 +18,10 @@ dependencies:
   open_filex: ^4.5.0
   flutter_local_notifications: ^19.0.0
   video_player: ^2.9.2
+  file_picker: ^8.1.2
+  flutter_file_dialog: ^3.0.2
+  record: ^5.2.0
+  share_plus: ^10.1.4
 
 dev_dependencies:
   flutter_test:

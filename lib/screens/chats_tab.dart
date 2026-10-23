@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../presence.dart';
 import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -82,7 +83,7 @@ class _ChatsTabState extends State<ChatsTab> {
         children: [
           GestureDetector(
             onTap: widget.onOpenProfile,
-            child: Avatar(name: myPseudo ?? '?', size: 40),
+            child: Avatar(name: myPseudo ?? '?', size: 40, userId: uid),
           ),
           const SizedBox(width: 12),
           const Expanded(
@@ -127,7 +128,12 @@ class _ChatsTabState extends State<ChatsTab> {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
                 children: [
-                  Avatar(name: name, size: 58),
+                  Avatar(
+                    name: name,
+                    size: 58,
+                    userId: list[i]['id'].toString(),
+                    showOnline: true,
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     name,
@@ -155,7 +161,12 @@ class _ChatsTabState extends State<ChatsTab> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
-            Avatar(name: name, size: 56),
+            Avatar(
+              name: name,
+              size: 56,
+              userId: profile['id'].toString(),
+              showOnline: true,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../notifications.dart';
+import '../presence.dart';
 import '../repo.dart';
 import '../settings.dart';
 import '../updater.dart';
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     Repo.I.start();
+    Presence.I.start();
     if (AppSettings.I.notifications.value) Notifier.requestPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ensureProfile();
@@ -42,7 +44,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) Repo.I.start();
+    if (state == AppLifecycleState.resumed) {
+      Repo.I.start();
+      Presence.I.start();
+    }
   }
 
   // Un nouveau compte doit choisir un pseudo pour apparaître chez les autres.

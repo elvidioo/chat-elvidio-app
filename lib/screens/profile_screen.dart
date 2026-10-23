@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'dart:typed_data';
+
+import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../presence.dart';
 import '../repo.dart';
 import '../theme.dart';
 import 'settings_screen.dart';
@@ -67,6 +73,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _pickPhoto() async {
+    final user = _db.auth.currentUser;
+    if (user == null) return;
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        imageQuality: 80,
+      );
+      if (file == null) return;
+      setState(() => _saving = true);
+      final bytes = await file.readAsBytes();
+      final path = '${user.id}/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await _db.storage.from('media').uploadBinary(
+            path,
+            Uint8List.fromList(bytes),
+            fileOptions: const FileOptions(contentType: 'image/jpeg'),
+          );
+      final url = _db.storage.from('media').getPublicUrl(path);
+      await _db.from('profiles').update({'avatar_url': url}).eq('id', user.id);
+      Presence.I.setMyAvatar(user.id, url);
+      widget.onSaved?.call();
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Photo impossible à envoyer.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Future<void> _saveProfile() async {
     final pseudo = _pseudo.text.trim();
     final user = _db.auth.currentUser;
@@ -111,6 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
+    Presence.I.stop();
     await Repo.I.stop();
     await _db.auth.signOut();
     if (!mounted) return;
@@ -134,7 +170,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(child: Avatar(name: _pseudo.text, size: 96)),
+                  Center(
+                    child: GestureDetector(
+                      onTap: widget.firstTime ? null : _pickPhoto,
+                      child: Stack(
+                        children: [
+                          Avatar(
+                            name: _pseudo.text,
+                            size: 96,
+                            userId: _db.auth.currentUser?.id,
+                          ),
+                          if (!widget.firstTime)
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: CircleAvatar(
+                                radius: 15,
+                                backgroundColor: AppColors.primary,
+                                child: const Icon(Icons.camera_alt,
+                                    size: 16, color: Colors.white),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 18),
                   Text(
                     widget.firstTime
@@ -170,6 +230,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   if (widget.showLogout) ...[
                     const SizedBox(height: 20),
+                    OutlinedButton.icon(
+                      onPressed: () => Share.share(
+                        'Rejoins-moi sur Chat Elvidio ! Télécharge l\'app ici : '
+                        'https://github.com/elvidioo/chat-elvidio-app/releases/latest/download/chat-elvidio.apk',
+                      ),
+                      icon: const Icon(Icons.person_add_alt_1),
+                      label: const Text('Inviter des amis'),
+                    ),
+                    const SizedBox(height: 8),
                     OutlinedButton.icon(
                       onPressed: () => Navigator.push(
                         context,

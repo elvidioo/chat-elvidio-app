@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'notifications.dart';
+import 'presence.dart';
 import 'settings.dart';
 import 'widgets.dart';
 
@@ -54,6 +55,7 @@ class Repo {
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
       profiles = prof;
+      Presence.I.setAvatars(prof);
       for (final p in prof) {
         names[p['id'].toString()] = p['pseudo']?.toString() ?? '';
       }
@@ -164,11 +166,12 @@ class Repo {
     try {
       final data = await _db
           .from('profiles')
-          .select('id, pseudo')
+          .select('id, pseudo, avatar_url')
           .neq('id', uid ?? '')
           .order('pseudo')
           .timeout(const Duration(seconds: 6));
       profiles = List<Map<String, dynamic>>.from(data);
+      Presence.I.setAvatars(profiles);
       for (final p in profiles) {
         names[p['id'].toString()] = p['pseudo']?.toString() ?? '';
       }

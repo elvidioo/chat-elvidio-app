@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'presence.dart';
 import 'theme.dart';
 
 const _videoExt = ['mp4', 'mov', '3gp', 'webm', 'mkv'];
@@ -48,14 +49,71 @@ Color _avatarColor(String name) {
 }
 
 class Avatar extends StatelessWidget {
-  const Avatar({super.key, required this.name, this.size = 46});
+  const Avatar({
+    super.key,
+    required this.name,
+    this.size = 46,
+    this.userId,
+    this.showOnline = false,
+    this.photoUrl,
+  });
 
   final String name;
   final double size;
+  final String? userId;
+  final bool showOnline;
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
+    final id = userId;
+    if (id == null && photoUrl == null) return _circle(photoUrl);
+    return ListenableBuilder(
+      listenable: Listenable.merge([Presence.I.avatars, Presence.I.online]),
+      builder: (context, _) {
+        final url = photoUrl ?? Presence.I.avatars.value[id];
+        final isOn = showOnline && id != null && Presence.I.online.value.contains(id);
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            _circle(url),
+            if (isOn)
+              Positioned(
+                right: -1,
+                bottom: -1,
+                child: Container(
+                  width: size * 0.28,
+                  height: size * 0.28,
+                  decoration: BoxDecoration(
+                    color: AppColors.online,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.bg, width: 2),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _circle(String? url) {
     final letter = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
+    if (url != null && url.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          url,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _letter(letter),
+        ),
+      );
+    }
+    return _letter(letter);
+  }
+
+  Widget _letter(String letter) {
     return Container(
       width: size,
       height: size,
@@ -156,6 +214,7 @@ class ChatBubble extends StatelessWidget {
     this.text,
     this.time,
     this.avatarName,
+    this.avatarId,
     this.quoteName,
     this.quoteText,
     this.status,
@@ -170,6 +229,7 @@ class ChatBubble extends StatelessWidget {
   final String? text;
   final String? time;
   final String? avatarName;
+  final String? avatarId;
   final String? quoteName;
   final String? quoteText;
   final String? status;
@@ -321,7 +381,7 @@ class ChatBubble extends StatelessWidget {
           if (reserveAvatar)
             SizedBox(
               width: 34,
-              child: showAvatar ? Avatar(name: avatarName!, size: 26) : null,
+              child: showAvatar ? Avatar(name: avatarName!, size: 26, userId: avatarId) : null,
             ),
           Flexible(
             child: ConstrainedBox(
@@ -383,6 +443,8 @@ class Composer extends StatefulWidget {
     required this.onSend,
     this.onAttach,
     this.onLike,
+    this.onMic,
+    this.onTyping,
     this.hint = 'Aa',
     this.sending = false,
     this.attachIcon = Icons.photo_library_rounded,
@@ -392,6 +454,8 @@ class Composer extends StatefulWidget {
   final VoidCallback onSend;
   final VoidCallback? onAttach;
   final VoidCallback? onLike;
+  final VoidCallback? onMic;
+  final VoidCallback? onTyping;
   final String hint;
   final bool sending;
   final IconData attachIcon;
@@ -402,6 +466,7 @@ class Composer extends StatefulWidget {
 
 class _ComposerState extends State<Composer> {
   void _changed() {
+    if (widget.controller.text.isNotEmpty) widget.onTyping?.call();
     if (mounted) setState(() {});
   }
 
@@ -449,6 +514,11 @@ class _ComposerState extends State<Composer> {
                 onSubmitted: (_) => widget.onSend(),
               ),
             ),
+            if (!hasText && widget.onMic != null)
+              IconButton(
+                onPressed: widget.sending ? null : widget.onMic,
+                icon: Icon(Icons.mic, color: AppColors.primary, size: 28),
+              ),
             IconButton(
               onPressed: widget.sending
                   ? null

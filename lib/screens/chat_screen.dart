@@ -1,8 +1,18 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+
+import '../media.dart';
+import '../presence.dart';
 import '../repo.dart';
 import '../settings.dart';
 import '../theme.dart';
@@ -104,6 +114,16 @@ class _ChatScreenState extends State<ChatScreen> {
                 setState(() => replyTo = m);
               },
             ),
+            if ((m['media_url']?.toString() ?? '').isNotEmpty)
+              ListTile(
+                leading: Icon(Icons.download, color: AppColors.primary),
+                title: const Text('Télécharger'),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  final u = m['media_url'].toString();
+                  download(u, fileNameOf(u, m['media_name']?.toString()));
+                },
+              ),
             if (text.isNotEmpty)
               ListTile(
                 leading: Icon(Icons.copy, color: AppColors.primary),
@@ -176,6 +196,7 @@ class _ChatScreenState extends State<ChatScreen> {
         'content': content,
       }));
       messageController.clear();
+      Presence.I.setTyping(null);
       replyTo = null;
     } catch (_) {
       toast('Envoi impossible. Réessaie.');
@@ -201,6 +222,29 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> uploadAndSend(List<int> bytes, String name,
+      {String? contentType}) async {
+    if (bytes.length > maxMediaBytes) {
+      toast('Fichier trop lourd (50 Mo maximum).');
+      return;
+    }
+    final safeName = name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    final path = '$uid/${DateTime.now().millisecondsSinceEpoch}_$safeName';
+    await supabase.storage.from('media').uploadBinary(
+          path,
+          Uint8List.fromList(bytes),
+          fileOptions: FileOptions(contentType: contentType),
+        );
+    final url = supabase.storage.from('media').getPublicUrl(path);
+    await supabase.from('messages').insert(withReply({
+      'sender': uid,
+      'receiver': widget.receiverId,
+      'media_url': url,
+      'media_name': name,
+    }));
+    replyTo = null;
+  }
+
   Future<void> sendMedia({required bool video}) async {
     if (sending) return;
     try {
@@ -216,33 +260,104 @@ class _ChatScreenState extends State<ChatScreen> {
             );
       if (file == null) return;
       setState(() => sending = true);
-
-      final bytes = await file.readAsBytes();
-      if (bytes.length > maxMediaBytes) {
-        toast('Fichier trop lourd (50 Mo maximum).');
-        return;
-      }
-
-      final safeName = file.name.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-      final path = '$uid/${DateTime.now().millisecondsSinceEpoch}_$safeName';
-      await supabase.storage.from('media').uploadBinary(
-            path,
-            bytes,
-            fileOptions: FileOptions(contentType: file.mimeType),
-          );
-      final url = supabase.storage.from('media').getPublicUrl(path);
-
-      await supabase.from('messages').insert(withReply({
-        'sender': uid,
-        'receiver': widget.receiverId,
-        'media_url': url,
-      }));
-      replyTo = null;
+      await uploadAndSend(await file.readAsBytes(), file.name,
+          contentType: file.mimeType);
     } catch (_) {
       toast('Envoi du fichier impossible. Réessaie.');
     } finally {
       if (mounted) setState(() => sending = false);
     }
+  }
+
+  Future<void> sendDocument() async {
+    if (sending) return;
+    try {
+      final res = await FilePicker.platform.pickFiles();
+      final path = res?.files.single.path;
+      if (path == null) return;
+      setState(() => sending = true);
+      final f = File(path);
+      await uploadAndSend(await f.readAsBytes(), res!.files.single.name);
+    } catch (_) {
+      toast('Envoi du document impossible. Réessaie.');
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
+  // ---- Messages vocaux ----
+  final recorder = AudioRecorder();
+  bool recording = false;
+  int recSeconds = 0;
+  Timer? recTimer;
+  String? recPath;
+
+  Future<void> startRecording() async {
+    try {
+      if (!await recorder.hasPermission()) {
+        toast('Autorise le microphone pour envoyer un vocal.');
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      recPath = '${dir.path}/vocal_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc),
+          path: recPath!);
+      recSeconds = 0;
+      recTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => recSeconds++);
+      });
+      setState(() => recording = true);
+    } catch (_) {
+      toast('Impossible de démarrer l\'enregistrement.');
+    }
+  }
+
+  Future<void> stopRecording({required bool send}) async {
+    recTimer?.cancel();
+    String? path;
+    try {
+      path = await recorder.stop();
+    } catch (_) {}
+    if (mounted) setState(() => recording = false);
+    if (!send || path == null || recSeconds < 1) return;
+    try {
+      setState(() => sending = true);
+      final bytes = await File(path).readAsBytes();
+      await uploadAndSend(bytes, 'vocal.m4a', contentType: 'audio/mp4');
+    } catch (_) {
+      toast('Envoi du vocal impossible. Réessaie.');
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
+  Widget recordingBar() {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: () => stopRecording(send: false),
+              icon: const Icon(Icons.delete, color: Colors.redAccent),
+            ),
+            const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 14),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Enregistrement  ${formatDuration(Duration(seconds: recSeconds))}',
+                style: TextStyle(color: AppColors.text),
+              ),
+            ),
+            IconButton(
+              onPressed: () => stopRecording(send: true),
+              icon: Icon(Icons.send_rounded, color: AppColors.primary, size: 28),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void pickMedia() {
@@ -271,13 +386,46 @@ class _ChatScreenState extends State<ChatScreen> {
                 sendMedia(video: true);
               },
             ),
+            ListTile(
+              leading: Icon(Icons.insert_drive_file, color: AppColors.primary),
+              title: const Text('Document'),
+              onTap: () {
+                Navigator.pop(sheet);
+                sendDocument();
+              },
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget mediaBubble(String url) {
+  Future<void> download(String url, String name) async {
+    toast('Téléchargement…');
+    try {
+      final ok = await saveToPhone(url, name);
+      if (ok) toast('Fichier enregistré');
+    } catch (_) {
+      toast('Téléchargement impossible.');
+    }
+  }
+
+  Widget mediaBubble(String url, String? name, bool mine) {
+    if (isAudioUrl(url)) return AudioBubble(url: url, mine: mine);
+    if (!isVideoUrl(url) && !isImageUrl(url)) {
+      final n = fileNameOf(url, name);
+      return FileBubble(
+        name: n,
+        mine: mine,
+        onTap: () async {
+          try {
+            await openRemoteFile(url, n);
+          } catch (_) {
+            toast('Ouverture impossible.');
+          }
+        },
+      );
+    }
     if (isVideoUrl(url)) {
       return GestureDetector(
         onTap: () => Navigator.push(
@@ -339,6 +487,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    Presence.I.setTyping(null);
+    recTimer?.cancel();
+    recorder.dispose();
     Repo.I.activePeer = null;
     Repo.I.messages.removeListener(markRead);
     messageController.dispose();
@@ -364,13 +515,41 @@ class _ChatScreenState extends State<ChatScreen> {
         titleSpacing: 0,
         title: Row(
           children: [
-            Avatar(name: widget.receiverName, size: 38),
+            Avatar(
+              name: widget.receiverName,
+              size: 38,
+              userId: widget.receiverId,
+              showOnline: true,
+            ),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(
-                widget.receiverName,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              child: ListenableBuilder(
+                listenable: Listenable.merge(
+                    [Presence.I.online, Presence.I.typingToMe]),
+                builder: (context, _) {
+                  final typing =
+                      Presence.I.typingToMe.value.contains(widget.receiverId);
+                  final on = Presence.I.online.value.contains(widget.receiverId);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.receiverName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w700),
+                      ),
+                      if (typing || on)
+                        Text(
+                          typing ? 'est en train d\'écrire…' : 'En ligne',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: typing ? AppColors.primary : AppColors.online,
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -408,7 +587,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Avatar(name: widget.receiverName, size: 80),
+                        Avatar(name: widget.receiverName, size: 80, userId: widget.receiverId),
                         const SizedBox(height: 12),
                         Text(
                           widget.receiverName,
@@ -479,9 +658,10 @@ class _ChatScreenState extends State<ChatScreen> {
                               mine: isMine,
                               text: item['content']?.toString(),
                               media: (mediaUrl != null && mediaUrl.isNotEmpty)
-                                  ? mediaBubble(mediaUrl)
+                                  ? mediaBubble(mediaUrl, item['media_name']?.toString(), isMine)
                                   : null,
                               avatarName: isMine ? null : widget.receiverName,
+                              avatarId: isMine ? null : widget.receiverId,
                               quoteName: quoted == null ? null : nameOf(quoted),
                               quoteText: quoted == null
                                   ? (item['reply_to'] != null
@@ -505,11 +685,13 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (sending) const LinearProgressIndicator(minHeight: 2),
           replyBar(),
-          Composer(
+          if (recording) recordingBar() else Composer(
             controller: messageController,
             onSend: sendMessage,
             onAttach: pickMedia,
             onLike: sendLike,
+            onMic: startRecording,
+            onTyping: () => Presence.I.setTyping(widget.receiverId),
             sending: sending,
           ),
         ],
