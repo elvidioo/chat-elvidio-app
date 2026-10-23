@@ -69,10 +69,10 @@ class Avatar extends StatelessWidget {
     final id = userId;
     if (id == null && photoUrl == null) return _circle(photoUrl);
     return ListenableBuilder(
-      listenable: Listenable.merge([Presence.I.avatars, Presence.I.online]),
+      listenable: Listenable.merge([LivePresence.I.avatars, LivePresence.I.online]),
       builder: (context, _) {
-        final url = photoUrl ?? Presence.I.avatars.value[id];
-        final isOn = showOnline && id != null && Presence.I.online.value.contains(id);
+        final url = photoUrl ?? LivePresence.I.avatars.value[id];
+        final isOn = showOnline && id != null && LivePresence.I.online.value.contains(id);
         return Stack(
           clipBehavior: Clip.none,
           children: [

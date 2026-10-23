@@ -55,7 +55,7 @@ class Repo {
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
       profiles = prof;
-      Presence.I.setAvatars(prof);
+      LivePresence.I.setAvatars(prof);
       for (final p in prof) {
         names[p['id'].toString()] = p['pseudo']?.toString() ?? '';
       }
@@ -171,7 +171,7 @@ class Repo {
           .order('pseudo')
           .timeout(const Duration(seconds: 6));
       profiles = List<Map<String, dynamic>>.from(data);
-      Presence.I.setAvatars(profiles);
+      LivePresence.I.setAvatars(profiles);
       for (final p in profiles) {
         names[p['id'].toString()] = p['pseudo']?.toString() ?? '';
       }

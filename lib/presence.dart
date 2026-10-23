@@ -4,9 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Statut "en ligne", "est en train d'écrire" et photos de profil.
-class Presence {
-  Presence._();
-  static final Presence I = Presence._();
+class LivePresence {
+  LivePresence._();
+  static final LivePresence I = LivePresence._();
 
   /// Identifiants des personnes actuellement en ligne.
   final ValueNotifier<Set<String>> online = ValueNotifier<Set<String>>({});

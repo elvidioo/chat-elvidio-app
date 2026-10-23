@@ -93,7 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
       final url = _db.storage.from('media').getPublicUrl(path);
       await _db.from('profiles').update({'avatar_url': url}).eq('id', user.id);
-      Presence.I.setMyAvatar(user.id, url);
+      LivePresence.I.setMyAvatar(user.id, url);
       widget.onSaved?.call();
     } catch (_) {
       if (mounted) setState(() => _error = 'Photo impossible à envoyer.');
@@ -146,7 +146,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
-    Presence.I.stop();
+    LivePresence.I.stop();
     await Repo.I.stop();
     await _db.auth.signOut();
     if (!mounted) return;

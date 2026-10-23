@@ -196,7 +196,7 @@ class _ChatScreenState extends State<ChatScreen> {
         'content': content,
       }));
       messageController.clear();
-      Presence.I.setTyping(null);
+      LivePresence.I.setTyping(null);
       replyTo = null;
     } catch (_) {
       toast('Envoi impossible. Réessaie.');
@@ -487,7 +487,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    Presence.I.setTyping(null);
+    LivePresence.I.setTyping(null);
     recTimer?.cancel();
     recorder.dispose();
     Repo.I.activePeer = null;
@@ -525,11 +525,11 @@ class _ChatScreenState extends State<ChatScreen> {
             Expanded(
               child: ListenableBuilder(
                 listenable: Listenable.merge(
-                    [Presence.I.online, Presence.I.typingToMe]),
+                    [LivePresence.I.online, LivePresence.I.typingToMe]),
                 builder: (context, _) {
                   final typing =
-                      Presence.I.typingToMe.value.contains(widget.receiverId);
-                  final on = Presence.I.online.value.contains(widget.receiverId);
+                      LivePresence.I.typingToMe.value.contains(widget.receiverId);
+                  final on = LivePresence.I.online.value.contains(widget.receiverId);
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -691,7 +691,7 @@ class _ChatScreenState extends State<ChatScreen> {
             onAttach: pickMedia,
             onLike: sendLike,
             onMic: startRecording,
-            onTyping: () => Presence.I.setTyping(widget.receiverId),
+            onTyping: () => LivePresence.I.setTyping(widget.receiverId),
             sending: sending,
           ),
         ],
