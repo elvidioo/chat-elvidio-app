@@ -45,7 +45,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final messageController = TextEditingController();
   late final String uid = supabase.auth.currentUser!.id;
   bool sending = false;
-  final List<Map<String, dynamic>> outbox = [];
   Map<String, dynamic>? replyTo;
   int _lastMarked = -1;
 
@@ -295,38 +294,18 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> sendMessage() async {
     final content = messageController.text.trim();
     if (content.isEmpty) return;
-    final local = <String, dynamic>{
-      'id': -DateTime.now().microsecondsSinceEpoch,
-      'sender': uid,
-      'receiver': widget.receiverId,
-      'content': content,
-      'created_at': DateTime.now().toUtc().toIso8601String(),
-      'reply_to': replyTo?['id'],
-      '_pending': true,
-    };
+    final reply = replyTo?['id'];
     messageController.clear();
     LivePresence.I.setTyping(null);
-    setState(() {
-      outbox.insert(0, local);
-      replyTo = null;
-    });
-    await deliver(local);
+    setState(() => replyTo = null);
+    await Repo.I.enqueue(
+      receiver: widget.receiverId,
+      content: content,
+      replyTo: reply,
+    );
   }
 
-  Future<void> deliver(Map<String, dynamic> local) async {
-    if (mounted) setState(() => local['_failed'] = false);
-    try {
-      await supabase.from('messages').insert({
-        'sender': uid,
-        'receiver': widget.receiverId,
-        'content': local['content'],
-        if (local['reply_to'] != null) 'reply_to': local['reply_to'],
-      });
-      if (mounted) setState(() => outbox.remove(local));
-    } catch (_) {
-      if (mounted) setState(() => local['_failed'] = true);
-    }
-  }
+  Future<void> deliver(Map<String, dynamic> local) async => Repo.I.flush();
 
   Future<void> react(Map<String, dynamic> m, String emoji) async {
     final id = (m['id'] as num).toInt();
@@ -755,13 +734,15 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: ListenableBuilder(
               listenable:
-                  Listenable.merge([Repo.I.messages, Repo.I.reactions]),
+                  Listenable.merge(
+                      [Repo.I.messages, Repo.I.reactions, Repo.I.outbox]),
               builder: (context, _) {
                 final all = Repo.I.messages.value;
                 // Du plus récent au plus ancien (liste inversée).
                 final lastMineIndexHolder = <int>[];
                 final messages = [
-                  ...outbox,
+                  ...Repo.I.outbox.value
+                      .where((m) => m['receiver'] == widget.receiverId),
                   ...all.where((m) =>
                         (m['sender'] == uid &&
                             m['receiver'] == widget.receiverId) ||
@@ -829,7 +810,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       }
                       if (item['_pending'] == true) {
                         status = item['_failed'] == true
-                            ? 'Non envoyé \u00B7 toucher pour réessayer'
+                            ? 'En attente de connexion \u00B7 toucher pour réessayer'
                             : 'Envoi…';
                       }
                     }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -150,6 +151,125 @@ class Repo {
     } catch (_) {}
   }
 
+  // ---- File d'attente d'envoi (survit à la fermeture de l'app) ----
+  final ValueNotifier<List<Map<String, dynamic>>> outbox =
+      ValueNotifier<List<Map<String, dynamic>>>(<Map<String, dynamic>>[]);
+  Timer? _flushTimer;
+  bool _flushing = false;
+  static const _maxQueue = 200;
+  static const _maxAge = Duration(days: 7);
+
+  Future<File> _outboxFile() async {
+    final dir = await getApplicationSupportDirectory();
+    await dir.create(recursive: true);
+    return File('${dir.path}/outbox.json');
+  }
+
+  String _newId() {
+    final r = Random.secure();
+    String h(int n) => List.generate(n, (_) => r.nextInt(16).toRadixString(16)).join();
+    return '${h(8)}-${h(4)}-4${h(3)}-${(8 + r.nextInt(4)).toRadixString(16)}${h(3)}-${h(12)}';
+  }
+
+  Future<void> _loadOutbox(String uid) async {
+    try {
+      final f = await _outboxFile();
+      if (!await f.exists()) return;
+      final data = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+      if (data['uid'] != uid) return;
+      final cutoff = DateTime.now().toUtc().subtract(_maxAge);
+      final list = (data['items'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .where((m) =>
+              (DateTime.tryParse(m['created_at']?.toString() ?? '') ?? cutoff)
+                  .isAfter(cutoff))
+          .toList();
+      outbox.value = list;
+    } catch (_) {}
+  }
+
+  Future<void> _saveOutbox() async {
+    final uid = _uid;
+    if (uid == null) return;
+    try {
+      final f = await _outboxFile();
+      await f.writeAsString(jsonEncode({'uid': uid, 'items': outbox.value}));
+    } catch (_) {}
+  }
+
+  /// Ajoute un message à la file : il s'affiche tout de suite, puis part dès que possible.
+  Future<void> enqueue({
+    required String receiver,
+    required String content,
+    dynamic replyTo,
+  }) async {
+    final uid = _uid ?? _db.auth.currentUser?.id;
+    if (uid == null) return;
+    final item = <String, dynamic>{
+      'id': -DateTime.now().microsecondsSinceEpoch,
+      'client_id': _newId(),
+      'sender': uid,
+      'receiver': receiver,
+      'content': content,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'reply_to': replyTo,
+      '_pending': true,
+      '_failed': false,
+    };
+    var list = [item, ...outbox.value];
+    if (list.length > _maxQueue) list = list.sublist(0, _maxQueue);
+    outbox.value = list;
+    await _saveOutbox();
+    flush();
+  }
+
+  /// Envoie les messages en attente, du plus ancien au plus récent.
+  Future<void> flush() async {
+    if (_flushing || outbox.value.isEmpty) return;
+    _flushing = true;
+    try {
+      final ordered = outbox.value.reversed.toList();
+      for (final item in ordered) {
+        try {
+          await _db.from('messages').upsert({
+            'client_id': item['client_id'],
+            'sender': item['sender'],
+            'receiver': item['receiver'],
+            'content': item['content'],
+            if (item['reply_to'] != null) 'reply_to': item['reply_to'],
+          }, onConflict: 'sender,client_id', ignoreDuplicates: true)
+              .timeout(const Duration(seconds: 10));
+          outbox.value =
+              outbox.value.where((m) => m['client_id'] != item['client_id']).toList();
+          await _saveOutbox();
+        } on PostgrestException catch (e) {
+          // refus définitif (ex. plus amis, bloqué) : on abandonne ce message
+          if (e.code == '42501' || e.code == '23503' || e.code == '23514') {
+            outbox.value = outbox.value
+                .where((m) => m['client_id'] != item['client_id'])
+                .toList();
+            await _saveOutbox();
+          } else {
+            item['_failed'] = true;
+            outbox.value = List<Map<String, dynamic>>.from(outbox.value);
+            break;
+          }
+        } catch (_) {
+          item['_failed'] = true;
+          outbox.value = List<Map<String, dynamic>>.from(outbox.value);
+          break; // pas de réseau : on réessaiera
+        }
+      }
+    } finally {
+      _flushing = false;
+    }
+  }
+
+  void _startFlushTimer() {
+    _flushTimer?.cancel();
+    _flushTimer = Timer.periodic(const Duration(seconds: 10), (_) => flush());
+  }
+
   /// Demandes d'amis reçues, en attente.
   final ValueNotifier<int> pendingCount = ValueNotifier<int>(0);
   final Map<String, String> names = {};
@@ -228,7 +348,10 @@ class Repo {
       profiles = [];
       names.clear();
       await _loadCache(uid);
+      await _loadOutbox(uid);
     }
+    _startFlushTimer();
+    flush();
     _subscribe();
     _subscribeReactions();
     _subscribeGroups();
@@ -379,6 +502,12 @@ class Repo {
   /// À la déconnexion : on arrête tout et on efface la copie locale.
   Future<void> stop() async {
     _retry?.cancel();
+    _flushTimer?.cancel();
+    outbox.value = [];
+    try {
+      final of = await _outboxFile();
+      if (await of.exists()) await of.delete();
+    } catch (_) {}
     _profTimer?.cancel();
     _saveTimer?.cancel();
     await _sub?.cancel();
