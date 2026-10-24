@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../notifications.dart';
+import 'blocked_screen.dart';
 import '../settings.dart';
 import '../theme.dart';
 import '../presence.dart';
@@ -73,6 +74,16 @@ class SettingsScreen extends StatelessWidget {
               ),
               value: on,
               onChanged: s.setReadReceipts,
+            ),
+          ),
+          section('Confidentialité'),
+          ListTile(
+            leading: const Icon(Icons.block),
+            title: const Text('Utilisateurs bloqués'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BlockedScreen()),
             ),
           ),
           section('À propos'),

@@ -58,13 +58,14 @@ class _ChatsTabState extends State<ChatsTab> {
     if (mounted) setState(() => profiles = Repo.I.loadProfiles());
   }
 
-  void openChat(String id, String name) {
-    Navigator.push(
+  Future<void> openChat(String id, String name) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChatScreen(receiverId: id, receiverName: name),
       ),
     );
+    if (mounted) setState(() => profiles = Repo.I.loadProfiles());
   }
 
   DateTime? created(Map<String, dynamic>? m) =>

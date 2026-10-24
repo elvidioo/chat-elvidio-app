@@ -71,6 +71,28 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> confirmBlock() async {
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Bloquer ${widget.receiverName} ?'),
+        content: const Text(
+            'Cette personne sera retirée de tes amis et ne pourra plus t\'écrire. Tu pourras la débloquer dans Paramètres.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Bloquer')),
+        ],
+      ),
+    );
+    if (yes != true) return;
+    try {
+      await Repo.I.blockUser(widget.receiverId);
+      if (mounted) Navigator.pop(context);
+    } catch (_) {
+      toast('Blocage impossible. Réessaie.');
+    }
+  }
+
   Map<String, dynamic>? byId(dynamic id) {
     if (id == null) return null;
     for (final m in Repo.I.messages.value) {
@@ -639,6 +661,16 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ],
         ),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'block') confirmBlock();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'block', child: Text('Bloquer')),
+            ],
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(1),
           child: Divider(height: 1, color: AppColors.surface2),

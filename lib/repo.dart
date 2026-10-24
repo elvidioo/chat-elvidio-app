@@ -263,6 +263,24 @@ class Repo {
     }
   }
 
+  /// Bloque quelqu'un et le retire de mes amis.
+  Future<void> blockUser(String id) async {
+    final uid = _db.auth.currentUser?.id;
+    await _db.from('blocks').insert({'blocked': id});
+    try {
+      final fr = await _db.from('friendships').select('id, requester, addressee');
+      for (final f in fr) {
+        final a = f['requester'].toString();
+        final b = f['addressee'].toString();
+        if ((a == uid && b == id) || (a == id && b == uid)) {
+          await _db.from('friendships').delete().eq('id', f['id']);
+        }
+      }
+    } catch (_) {}
+    profiles = profiles.where((p) => p['id'].toString() != id).toList();
+    _scheduleSave();
+  }
+
   /// À la déconnexion : on arrête tout et on efface la copie locale.
   Future<void> stop() async {
     _retry?.cancel();
