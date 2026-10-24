@@ -32,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Repo.I.start();
     LivePresence.I.start();
     Push.init();
+    Repo.I.touchLastSeen();
     if (AppSettings.I.notifications.value) Notifier.requestPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ensureProfile();
@@ -47,7 +48,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) Repo.I.touchLastSeen();
     if (state == AppLifecycleState.resumed) {
+      Repo.I.touchLastSeen();
       Repo.I.start();
       LivePresence.I.start();
     }

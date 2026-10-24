@@ -220,6 +220,7 @@ class ChatBubble extends StatelessWidget {
     this.quoteName,
     this.quoteText,
     this.status,
+    this.reactions,
     this.read = false,
     this.joinedAbove = false,
     this.joinedBelow = false,
@@ -235,6 +236,7 @@ class ChatBubble extends StatelessWidget {
   final String? quoteName;
   final String? quoteText;
   final String? status;
+  final String? reactions;
   final bool read;
   final bool joinedAbove;
   final bool joinedBelow;
@@ -397,6 +399,17 @@ class ChatBubble extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   content,
+                  if (reactions != null && reactions!.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface2,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(reactions!, style: const TextStyle(fontSize: 13)),
+                    ),
                   if (status != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 2, right: 2),
@@ -679,4 +692,16 @@ class _LinkTextState extends State<LinkText> {
     }
     return Text.rich(TextSpan(children: spans), style: widget.style);
   }
+}
+
+
+/// "Vu à l'instant", "Vu il y a 5 min", "Vu hier"...
+String lastSeenText(DateTime? t) {
+  if (t == null) return '';
+  final d = DateTime.now().difference(t.toLocal());
+  if (d.inMinutes < 1) return 'Vu à l\'instant';
+  if (d.inMinutes < 60) return 'Vu il y a ${d.inMinutes} min';
+  if (d.inHours < 24) return 'Vu il y a ${d.inHours} h';
+  if (d.inDays == 1) return 'Vu hier';
+  return 'Vu il y a ${d.inDays} jours';
 }

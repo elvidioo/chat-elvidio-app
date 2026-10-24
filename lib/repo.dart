@@ -24,6 +24,38 @@ class Repo {
 
   List<Map<String, dynamic>> profiles = [];
 
+  /// message -> (utilisateur -> emoji)
+  final ValueNotifier<Map<int, Map<String, String>>> reactions =
+      ValueNotifier<Map<int, Map<String, String>>>({});
+  StreamSubscription<List<Map<String, dynamic>>>? _reactSub;
+
+  Future<void> touchLastSeen() async {
+    final uid = _db.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      await _db
+          .from('profiles')
+          .update({'last_seen': DateTime.now().toUtc().toIso8601String()})
+          .eq('id', uid);
+    } catch (_) {}
+  }
+
+  void _subscribeReactions() {
+    _reactSub?.cancel();
+    try {
+      _reactSub = _db
+          .from('message_reactions')
+          .stream(primaryKey: ['message_id', 'user_id']).listen((rows) {
+        final m = <int, Map<String, String>>{};
+        for (final r in rows) {
+          final id = (r['message_id'] as num).toInt();
+          (m[id] ??= {})[r['user_id'].toString()] = r['emoji'].toString();
+        }
+        reactions.value = m;
+      }, onError: (_) {});
+    } catch (_) {}
+  }
+
   /// Demandes d'amis reçues, en attente.
   final ValueNotifier<int> pendingCount = ValueNotifier<int>(0);
   final Map<String, String> names = {};
@@ -104,6 +136,7 @@ class Repo {
       await _loadCache(uid);
     }
     _subscribe();
+    _subscribeReactions();
     _refreshProfiles();
     _profTimer?.cancel();
     _profTimer = Timer.periodic(
@@ -203,7 +236,7 @@ class Repo {
           ? <dynamic>[]
           : await _db
               .from('profiles')
-              .select('id, pseudo, avatar_url')
+              .select('id, pseudo, avatar_url, last_seen')
               .inFilter('id', peers.toList())
               .order('pseudo')
               .timeout(const Duration(seconds: 6));
@@ -237,6 +270,9 @@ class Repo {
     _saveTimer?.cancel();
     await _sub?.cancel();
     _sub = null;
+    await _reactSub?.cancel();
+    _reactSub = null;
+    reactions.value = {};
     _uid = null;
     _known.clear();
     profiles = [];

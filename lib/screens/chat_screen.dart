@@ -41,6 +41,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final messageController = TextEditingController();
   late final String uid = supabase.auth.currentUser!.id;
   bool sending = false;
+  final List<Map<String, dynamic>> outbox = [];
   Map<String, dynamic>? replyTo;
   int _lastMarked = -1;
 
@@ -106,6 +107,29 @@ class _ChatScreenState extends State<ChatScreen> {
       builder: (sheet) => SafeArea(
         child: Wrap(
           children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  for (final e in const [
+                    '\u{1F44D}',
+                    '\u2764\uFE0F',
+                    '\u{1F602}',
+                    '\u{1F62E}',
+                    '\u{1F622}',
+                    '\u{1F64F}',
+                  ])
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(sheet);
+                        react(m, e);
+                      },
+                      child: Text(e, style: const TextStyle(fontSize: 30)),
+                    ),
+                ],
+              ),
+            ),
             ListTile(
               leading: Icon(Icons.reply, color: AppColors.primary),
               title: const Text('Répondre'),
@@ -186,24 +210,76 @@ class _ChatScreenState extends State<ChatScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(t)));
   }
 
+  /// Le message s'affiche tout de suite ("Envoi…"), puis part en arrière-plan.
   Future<void> sendMessage() async {
     final content = messageController.text.trim();
-    if (content.isEmpty || sending) return;
-    setState(() => sending = true);
+    if (content.isEmpty) return;
+    final local = <String, dynamic>{
+      'id': -DateTime.now().microsecondsSinceEpoch,
+      'sender': uid,
+      'receiver': widget.receiverId,
+      'content': content,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'reply_to': replyTo?['id'],
+      '_pending': true,
+    };
+    messageController.clear();
+    LivePresence.I.setTyping(null);
+    setState(() {
+      outbox.insert(0, local);
+      replyTo = null;
+    });
+    await deliver(local);
+  }
+
+  Future<void> deliver(Map<String, dynamic> local) async {
+    if (mounted) setState(() => local['_failed'] = false);
     try {
-      await supabase.from('messages').insert(withReply({
+      await supabase.from('messages').insert({
         'sender': uid,
         'receiver': widget.receiverId,
-        'content': content,
-      }));
-      messageController.clear();
-      LivePresence.I.setTyping(null);
-      replyTo = null;
+        'content': local['content'],
+        if (local['reply_to'] != null) 'reply_to': local['reply_to'],
+      });
+      if (mounted) setState(() => outbox.remove(local));
     } catch (_) {
-      toast('Envoi impossible. Réessaie.');
-    } finally {
-      if (mounted) setState(() => sending = false);
+      if (mounted) setState(() => local['_failed'] = true);
     }
+  }
+
+  Future<void> react(Map<String, dynamic> m, String emoji) async {
+    final id = (m['id'] as num).toInt();
+    if (id < 0) return;
+    final mine = Repo.I.reactions.value[id]?[uid];
+    try {
+      if (mine == emoji) {
+        await supabase
+            .from('message_reactions')
+            .delete()
+            .eq('message_id', id)
+            .eq('user_id', uid);
+      } else {
+        await supabase.from('message_reactions').upsert(
+          {'message_id': id, 'user_id': uid, 'emoji': emoji},
+          onConflict: 'message_id,user_id',
+        );
+      }
+    } catch (_) {
+      toast('Réaction impossible.');
+    }
+  }
+
+  String reactionText(Map<String, dynamic> m) {
+    final id = (m['id'] as num).toInt();
+    final r = Repo.I.reactions.value[id];
+    if (r == null || r.isEmpty) return '';
+    final counts = <String, int>{};
+    for (final e in r.values) {
+      counts[e] = (counts[e] ?? 0) + 1;
+    }
+    return counts.entries
+        .map((e) => e.value > 1 ? '${e.key} ${e.value}' : e.key)
+        .join('  ');
   }
 
   Future<void> sendLike() async {
@@ -529,6 +605,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   final typing =
                       LivePresence.I.typingToMe.value.contains(widget.receiverId);
                   final on = LivePresence.I.online.value.contains(widget.receiverId);
+                  DateTime? lastSeen;
+                  for (final p in Repo.I.profiles) {
+                    if (p['id'].toString() == widget.receiverId) {
+                      lastSeen = DateTime.tryParse(p['last_seen']?.toString() ?? '');
+                    }
+                  }
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -538,12 +620,16 @@ class _ChatScreenState extends State<ChatScreen> {
                         style: const TextStyle(
                             fontSize: 17, fontWeight: FontWeight.w700),
                       ),
-                      if (typing || on)
+                      if (typing || on || lastSeen != null)
                         Text(
-                          typing ? 'est en train d\'écrire…' : 'En ligne',
+                          typing
+                              ? 'est en train d\'écrire…'
+                              : (on ? 'En ligne' : lastSeenText(lastSeen)),
                           style: TextStyle(
                             fontSize: 12,
-                            color: typing ? AppColors.primary : AppColors.online,
+                            color: typing
+                                ? AppColors.primary
+                                : (on ? AppColors.online : AppColors.muted),
                           ),
                         ),
                     ],
@@ -561,18 +647,21 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ValueListenableBuilder<List<Map<String, dynamic>>>(
-              valueListenable: Repo.I.messages,
-              builder: (context, all, _) {
+            child: ListenableBuilder(
+              listenable:
+                  Listenable.merge([Repo.I.messages, Repo.I.reactions]),
+              builder: (context, _) {
+                final all = Repo.I.messages.value;
                 // Du plus récent au plus ancien (liste inversée).
                 final lastMineIndexHolder = <int>[];
-                final messages = all
-                    .where((m) =>
+                final messages = [
+                  ...outbox,
+                  ...all.where((m) =>
                         (m['sender'] == uid &&
                             m['receiver'] == widget.receiverId) ||
                         (m['sender'] == widget.receiverId &&
-                            m['receiver'] == uid))
-                    .toList();
+                            m['receiver'] == uid)),
+                ];
                 for (var i = 0; i < messages.length; i++) {
                   if (messages[i]['sender'] == uid) {
                     lastMineIndexHolder.add(i);
@@ -632,6 +721,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       if (index == lastMine) {
                         status = isRead ? '\u2713\u2713 Vu' : '\u2713 Envoyé';
                       }
+                      if (item['_pending'] == true) {
+                        status = item['_failed'] == true
+                            ? 'Non envoyé \u00B7 toucher pour réessayer'
+                            : 'Envoi…';
+                      }
                     }
 
                     return Column(
@@ -652,7 +746,12 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                           ),
                           child: GestureDetector(
-                            onLongPress: () => messageActions(item),
+                            onTap: item['_failed'] == true
+                                ? () => deliver(item)
+                                : null,
+                            onLongPress: item['_pending'] == true
+                                ? null
+                                : () => messageActions(item),
                             child: ChatBubble(
                               mine: isMine,
                               text: item['content']?.toString(),
@@ -668,6 +767,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                       : null)
                                   : describe(quoted),
                               status: status,
+                              reactions: item['_pending'] == true
+                                  ? null
+                                  : reactionText(item),
                               read: isRead,
                               joinedAbove:
                                   !showHeader && sameGroup(item, older),

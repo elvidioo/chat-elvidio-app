@@ -172,7 +172,8 @@ class _ChatsTabState extends State<ChatsTab> {
     );
   }
 
-  Widget tile(Map<String, dynamic> profile, Map<String, dynamic>? last) {
+  Widget tile(Map<String, dynamic> profile, Map<String, dynamic>? last,
+      [int unreadCount = 0]) {
     final name = profile['pseudo']?.toString() ?? 'Utilisateur';
     final unread =
         last != null && last['sender'] != uid && last['read_at'] == null;
@@ -234,12 +235,22 @@ class _ChatsTabState extends State<ChatsTab> {
             ),
             if (unread)
               Container(
-                width: 12,
-                height: 12,
+                constraints: const BoxConstraints(minWidth: 22),
+                height: 22,
+                alignment: Alignment.center,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 margin: const EdgeInsets.only(left: 8),
                 decoration: BoxDecoration(
                   color: AppColors.primary,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Text(
+                  unreadCount > 99 ? '99+' : '${unreadCount < 1 ? 1 : unreadCount}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
           ],
@@ -277,9 +288,13 @@ class _ChatsTabState extends State<ChatsTab> {
       List<Map<String, dynamic>> latestMessages) {
     // Dernier message de chaque conversation (liste déjà triée du plus récent).
     final lastByPeer = <String, Map<String, dynamic>>{};
+    final unreadByPeer = <String, int>{};
     for (final m in latestMessages) {
       final peer = (m['sender'] == uid ? m['receiver'] : m['sender']).toString();
       lastByPeer.putIfAbsent(peer, () => m);
+      if (m['receiver'] == uid && m['read_at'] == null) {
+        unreadByPeer[peer] = (unreadByPeer[peer] ?? 0) + 1;
+      }
     }
 
     final filtered = all.where((p) {
@@ -309,7 +324,8 @@ class _ChatsTabState extends State<ChatsTab> {
           : message(Icons.search_off, 'Aucun résultat', 'Essaie un autre nom.'));
     } else {
       for (final p in filtered) {
-        children.add(tile(p, lastByPeer[p['id'].toString()]));
+        children.add(tile(p, lastByPeer[p['id'].toString()],
+            unreadByPeer[p['id'].toString()] ?? 0));
       }
     }
     return ListView(
