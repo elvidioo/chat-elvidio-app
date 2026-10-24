@@ -22,6 +22,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
   List<Map<String, dynamic>> _friendships = [];
   final Map<String, Map<String, dynamic>> _people = {};
   List<Map<String, dynamic>> _results = [];
+  List<Map<String, dynamic>> _suggestions = [];
   bool _loading = true;
   bool _searching = false;
   String? _error;
@@ -59,6 +60,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
         }
       }
       _error = null;
+      try {
+        final sg = await _db.rpc('suggest_friends');
+        _suggestions = List<Map<String, dynamic>>.from(sg as List);
+      } catch (_) {}
     } catch (_) {
       _error = 'Pas de connexion. Réessaie.';
     }
@@ -133,7 +138,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   String _name(String id) => _people[id]?['pseudo']?.toString() ?? 'Utilisateur';
 
-  Widget _row(String id, String name, {required List<Widget> actions}) {
+  Widget _row(String id, String name,
+      {required List<Widget> actions, String? subtitle}) {
     return ListTile(
       onTap: () => Navigator.push(
         context,
@@ -143,6 +149,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
       ),
       leading: Avatar(name: name, size: 46, userId: id, photoUrl: _people[id]?['avatar_url']?.toString()),
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle, style: TextStyle(color: AppColors.muted)),
       trailing: Row(mainAxisSize: MainAxisSize.min, children: actions),
     );
   }
@@ -240,6 +249,32 @@ class _FriendsScreenState extends State<FriendsScreen> {
                         onPressed: () => _remove(f),
                         child: const Text('Annuler')),
                   ]),
+            if (_results.isEmpty && _suggestions.isNotEmpty)
+              _title('Personnes que tu connais peut-être'),
+            if (_results.isEmpty)
+              for (final p in _suggestions)
+                Builder(builder: (context) {
+                  final id = p['id'].toString();
+                  _people[id] = {
+                    'id': id,
+                    'pseudo': p['pseudo'],
+                    'avatar_url': p['avatar_url'],
+                  };
+                  final n = (p['mutual'] as num?)?.toInt() ?? 0;
+                  return _row(
+                    id,
+                    p['pseudo']?.toString() ?? 'Utilisateur',
+                    subtitle: n > 0
+                        ? '$n ami${n > 1 ? 's' : ''} en commun'
+                        : null,
+                    actions: [
+                      FilledButton(
+                        onPressed: () => _request(id),
+                        child: const Text('Ajouter'),
+                      ),
+                    ],
+                  );
+                }),
             _title('Mes amis (${friends.length})'),
             if (friends.isEmpty && !_loading)
               Padding(
