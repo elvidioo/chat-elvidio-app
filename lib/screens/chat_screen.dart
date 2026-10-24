@@ -72,6 +72,38 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> editMessage(Map<String, dynamic> m) async {
+    final ctrl = TextEditingController(text: m['content']?.toString() ?? '');
+    final value = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Modifier le message'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 5,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+              child: const Text('Enregistrer')),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (value == null || value.isEmpty || value == m['content']) return;
+    try {
+      await supabase.rpc('edit_message',
+          params: {'mid': (m['id'] as num).toInt(), 'new_content': value});
+    } catch (_) {
+      toast('Modification impossible.');
+    }
+  }
+
   Future<void> confirmBlock() async {
     final yes = await showDialog<bool>(
       context: context,
@@ -169,6 +201,17 @@ class _ChatScreenState extends State<ChatScreen> {
                   Navigator.pop(sheet);
                   final u = m['media_url'].toString();
                   download(u, fileNameOf(u, m['media_name']?.toString()));
+                },
+              ),
+            if (m['sender'] == uid &&
+                text.isNotEmpty &&
+                (m['media_url']?.toString() ?? '').isEmpty)
+              ListTile(
+                leading: Icon(Icons.edit, color: AppColors.primary),
+                title: const Text('Modifier'),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  editMessage(m);
                 },
               ),
             if (text.isNotEmpty)
@@ -771,6 +814,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             ? 'Non envoyé \u00B7 toucher pour réessayer'
                             : 'Envoi…';
                       }
+                    }
+                    if (item['edited_at'] != null && item['_pending'] != true) {
+                      status = status == null ? 'modifié' : '$status \u00B7 modifié';
                     }
 
                     return Column(

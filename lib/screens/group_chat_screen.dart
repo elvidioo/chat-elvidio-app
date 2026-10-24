@@ -172,6 +172,38 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         .join('  ');
   }
 
+  Future<void> _edit(Map<String, dynamic> m) async {
+    final ctrl = TextEditingController(text: m['content']?.toString() ?? '');
+    final value = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Modifier le message'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          minLines: 1,
+          maxLines: 5,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, ctrl.text.trim()),
+              child: const Text('Enregistrer')),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (value == null || value.isEmpty || value == m['content']) return;
+    try {
+      await _db.rpc('edit_group_message',
+          params: {'mid': (m['id'] as num).toInt(), 'new_content': value});
+    } catch (_) {
+      _toast('Modification impossible.');
+    }
+  }
+
   void _actions(Map<String, dynamic> m) {
     final text = m['content']?.toString() ?? '';
     showModalBottomSheet<void>(
@@ -205,6 +237,17 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               ],
             ),
           ),
+          if (m['sender'] == uid &&
+              text.isNotEmpty &&
+              (m['media_url']?.toString() ?? '').isEmpty)
+            ListTile(
+              leading: Icon(Icons.edit, color: AppColors.primary),
+              title: const Text('Modifier'),
+              onTap: () {
+                Navigator.pop(sheet);
+                _edit(m);
+              },
+            ),
           if (text.isNotEmpty)
             ListTile(
               leading: Icon(Icons.copy, color: AppColors.primary),
@@ -453,6 +496,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                               : null,
                           text: text,
                           reactions: _reactionText(m),
+                          status: m['edited_at'] != null ? 'modifié' : null,
                           media: url.isEmpty
                               ? null
                               : _media(url, m['media_name']?.toString(), mine),
