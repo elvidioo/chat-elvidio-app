@@ -33,6 +33,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _pseudo = TextEditingController();
+  final _bio = TextEditingController();
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -48,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     _pseudo.dispose();
+    _bio.dispose();
     super.dispose();
   }
 
@@ -58,12 +60,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final profile = await _db
           .from('profiles')
-          .select('pseudo')
+          .select('pseudo, bio')
           .eq('id', user.id)
           .maybeSingle();
 
       if (mounted) {
         _pseudo.text = profile?['pseudo']?.toString() ?? '';
+        _bio.text = profile?['bio']?.toString() ?? '';
       }
     } catch (_) {
       if (mounted) {
@@ -123,6 +126,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _db.from('profiles').upsert({
         'id': user.id,
         'pseudo': pseudo,
+        'bio': _bio.text.trim().isEmpty ? null : _bio.text.trim(),
       }, onConflict: 'id');
 
       if (!mounted) return;
@@ -213,6 +217,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     decoration: const InputDecoration(
                       hintText: 'Pseudo',
                       prefixIcon: Icon(Icons.person_outline),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _bio,
+                    maxLength: 200,
+                    minLines: 1,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      hintText: 'Biographie (facultatif)',
+                      prefixIcon: Icon(Icons.info_outline),
                     ),
                   ),
                   if (_error != null)

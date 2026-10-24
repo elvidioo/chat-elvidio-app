@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'contact_profile_screen.dart';
 
 /// Amis : demandes reçues, recherche par pseudo, liste des amis.
 class FriendsScreen extends StatefulWidget {
@@ -134,6 +135,12 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   Widget _row(String id, String name, {required List<Widget> actions}) {
     return ListTile(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ContactProfileScreen(userId: id, name: name),
+        ),
+      ),
       leading: Avatar(name: name, size: 46, userId: id, photoUrl: _people[id]?['avatar_url']?.toString()),
       title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
       trailing: Row(mainAxisSize: MainAxisSize.min, children: actions),

@@ -17,6 +17,7 @@ import '../repo.dart';
 import '../settings.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'contact_profile_screen.dart';
 import 'video_screen.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -610,7 +611,18 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: Row(
+        title: GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ContactProfileScreen(
+                userId: widget.receiverId,
+                name: widget.receiverName,
+                onMessage: () => Navigator.pop(context),
+              ),
+            ),
+          ),
+          child: Row(
           children: [
             Avatar(
               name: widget.receiverName,
@@ -660,6 +672,7 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           ],
+        ),
         ),
         actions: [
           PopupMenuButton<String>(
