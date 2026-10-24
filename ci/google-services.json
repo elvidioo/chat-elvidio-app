@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "279434771228",
+    "project_id": "chat-elvidio",
+    "storage_bucket": "chat-elvidio.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:279434771228:android:a4adb24ac47d9fc03cd8d9",
+        "android_client_info": {
+          "package_name": "com.example.chat_elvidio_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0qiS6DeBhubUjUdLJRH4SlpI4nHJliLE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

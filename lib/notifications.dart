@@ -12,6 +12,15 @@ class Notifier {
     try {
       const android = AndroidInitializationSettings('@mipmap/ic_launcher');
       await _plugin.initialize(const InitializationSettings(android: android));
+      await _plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(const AndroidNotificationChannel(
+            'messages',
+            'Messages',
+            description: 'Nouveaux messages',
+            importance: Importance.high,
+          ));
       _ready = true;
     } catch (_) {}
   }

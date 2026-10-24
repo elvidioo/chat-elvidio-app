@@ -53,6 +53,40 @@ jobs:
                   f.write_text(g)
           PY
 
+      - name: Configurer Firebase (notifications)
+        run: |
+          python3 - <<'PY'
+          import re, shutil, sys
+          from pathlib import Path
+          shutil.copy("ci/google-services.json", "android/app/google-services.json")
+          ok = 0
+          for name in ("android/settings.gradle.kts", "android/settings.gradle"):
+              f = Path(name)
+              if f.exists():
+                  s = f.read_text()
+                  if "com.google.gms.google-services" not in s:
+                      if name.endswith(".kts"):
+                          s2 = re.sub(r'(id\("com\.android\.application"\) version "[^"]+" apply false)', r'\1\n    id("com.google.gms.google-services") version "4.4.2" apply false', s, count=1)
+                      else:
+                          s2 = re.sub(r"(id ['\"]com\.android\.application['\"] version ['\"][^'\"]+['\"] apply false)", r"\1\n    id 'com.google.gms.google-services' version '4.4.2' apply false", s, count=1)
+                      if s2 != s:
+                          f.write_text(s2); ok += 1
+          for name in ("android/app/build.gradle.kts", "android/app/build.gradle"):
+              f = Path(name)
+              if f.exists():
+                  s = f.read_text()
+                  if "com.google.gms.google-services" not in s:
+                      if name.endswith(".kts"):
+                          s2 = s.replace('id("com.android.application")', 'id("com.android.application")\n    id("com.google.gms.google-services")', 1)
+                      else:
+                          s2 = s.replace("id 'com.android.application'", "id 'com.android.application'\n    id 'com.google.gms.google-services'", 1).replace('id "com.android.application"', 'id "com.android.application"\n    id "com.google.gms.google-services"', 1)
+                      if s2 != s:
+                          f.write_text(s2); ok += 1
+          print("plugin google-services applique :", ok)
+          if ok < 2:
+              print("::warning title=Firebase::plugin google-services non applique (%d/2)" % ok)
+          PY
+
       - name: Forcer la signature avec la cle fixe
         run: |
           python3 - <<'PY'

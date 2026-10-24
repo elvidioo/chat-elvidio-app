@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../notifications.dart';
 import '../presence.dart';
+import '../push.dart';
 import '../repo.dart';
 import '../settings.dart';
 import '../updater.dart';
@@ -30,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     Repo.I.start();
     LivePresence.I.start();
+    Push.init();
     if (AppSettings.I.notifications.value) Notifier.requestPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ensureProfile();

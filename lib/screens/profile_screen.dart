@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../presence.dart';
+import '../push.dart';
 import '../repo.dart';
 import '../theme.dart';
 import 'settings_screen.dart';
@@ -146,6 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _logout() async {
+    await Push.logout();
     LivePresence.I.stop();
     await Repo.I.stop();
     await _db.auth.signOut();
