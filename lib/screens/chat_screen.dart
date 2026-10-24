@@ -13,7 +13,9 @@ import 'package:record/record.dart';
 
 import '../call_service.dart';
 import '../media.dart';
+import '../media_url.dart';
 import '../presence.dart';
+import '../report.dart';
 import '../repo.dart';
 import '../settings.dart';
 import '../theme.dart';
@@ -202,6 +204,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   Navigator.pop(sheet);
                   final u = m['media_url'].toString();
                   download(u, fileNameOf(u, m['media_name']?.toString()));
+                },
+              ),
+            if (m['sender'] != uid)
+              ListTile(
+                leading: Icon(Icons.flag_outlined, color: AppColors.muted),
+                title: const Text('Signaler ce message'),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  showReportDialog(context,
+                      kind: 'message',
+                      targetUser: m['sender'].toString(),
+                      targetId: (m['id'] as num).toInt());
                 },
               ),
             if (m['sender'] == uid &&
@@ -601,28 +615,12 @@ class _ChatScreenState extends State<ChatScreen> {
         builder: (_) => Dialog(
           backgroundColor: Colors.black,
           insetPadding: EdgeInsets.zero,
-          child: InteractiveViewer(child: Image.network(url)),
+          child: InteractiveViewer(child: SignedImage(url)),
         ),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
-        child: Image.network(
-          url,
-          width: 220,
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) => progress == null
-              ? child
-              : const SizedBox(
-                  width: 220,
-                  height: 140,
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-          errorBuilder: (_, __, ___) => const SizedBox(
-            width: 220,
-            height: 80,
-            child: Center(child: Text('Image indisponible')),
-          ),
-        ),
+        child: SignedImage(url, width: 220, fit: BoxFit.cover),
       ),
     );
   }
@@ -736,8 +734,13 @@ class _ChatScreenState extends State<ChatScreen> {
           PopupMenuButton<String>(
             onSelected: (v) {
               if (v == 'block') confirmBlock();
+              if (v == 'report') {
+                showReportDialog(context,
+                    kind: 'user', targetUser: widget.receiverId);
+              }
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(value: 'report', child: Text('Signaler')),
               PopupMenuItem(value: 'block', child: Text('Bloquer')),
             ],
           ),

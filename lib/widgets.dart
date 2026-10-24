@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'media_url.dart';
 import 'presence.dart';
 import 'theme.dart';
 
@@ -103,12 +104,12 @@ class Avatar extends StatelessWidget {
     final letter = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
     if (url != null && url.isNotEmpty) {
       return ClipOval(
-        child: Image.network(
+        child: SignedImage(
           url,
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _letter(letter),
+          placeholderHeight: size,
         ),
       );
     }

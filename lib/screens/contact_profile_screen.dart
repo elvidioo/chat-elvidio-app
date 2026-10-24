@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../presence.dart';
+import '../report.dart';
 import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -146,6 +147,13 @@ class _ContactProfileScreenState extends State<ContactProfileScreen> {
                     label: const Text('Envoyer un message'),
                   ),
                 const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () => showReportDialog(context,
+                      kind: 'user', targetUser: widget.userId),
+                  icon: Icon(Icons.flag_outlined, color: AppColors.muted),
+                  label: Text('Signaler',
+                      style: TextStyle(color: AppColors.muted)),
+                ),
                 TextButton.icon(
                   onPressed: _block,
                   icon: const Icon(Icons.block, color: Colors.redAccent),

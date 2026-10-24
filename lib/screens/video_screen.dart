@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../media_url.dart';
+
 /// Lecteur vidéo dans l'app (plus d'ouverture du navigateur).
 class VideoScreen extends StatefulWidget {
   const VideoScreen({super.key, required this.url});
@@ -12,8 +14,8 @@ class VideoScreen extends StatefulWidget {
 }
 
 class _VideoScreenState extends State<VideoScreen> {
-  late final VideoPlayerController controller =
-      VideoPlayerController.networkUrl(Uri.parse(widget.url));
+  VideoPlayerController? _c;
+  VideoPlayerController get controller => _c!;
   bool ready = false;
   String? error;
 
@@ -24,20 +26,28 @@ class _VideoScreenState extends State<VideoScreen> {
   @override
   void initState() {
     super.initState();
-    controller.addListener(_refresh);
-    controller.initialize().then((_) {
+    _start();
+  }
+
+  Future<void> _start() async {
+    try {
+      final real = await MediaUrl.resolve(widget.url);
+      final c = VideoPlayerController.networkUrl(Uri.parse(real));
+      _c = c;
+      c.addListener(_refresh);
+      await c.initialize();
       if (!mounted) return;
       setState(() => ready = true);
-      controller.play();
-    }).catchError((_) {
+      c.play();
+    } catch (_) {
       if (mounted) setState(() => error = 'Impossible de lire cette vidéo.');
-    });
+    }
   }
 
   @override
   void dispose() {
-    controller.removeListener(_refresh);
-    controller.dispose();
+    _c?.removeListener(_refresh);
+    _c?.dispose();
     super.dispose();
   }
 
@@ -48,7 +58,7 @@ class _VideoScreenState extends State<VideoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final value = controller.value;
+    final value = _c?.value ?? VideoPlayerValue.uninitialized();
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(

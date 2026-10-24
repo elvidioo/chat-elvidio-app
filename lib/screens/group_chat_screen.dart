@@ -11,6 +11,8 @@ import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../media.dart';
+import '../media_url.dart';
+import '../report.dart';
 import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -237,6 +239,18 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               ],
             ),
           ),
+          if (m['sender'] != uid)
+            ListTile(
+              leading: Icon(Icons.flag_outlined, color: AppColors.muted),
+              title: const Text('Signaler ce message'),
+              onTap: () {
+                Navigator.pop(sheet);
+                showReportDialog(context,
+                    kind: 'group_message',
+                    targetUser: m['sender'].toString(),
+                    targetId: (m['id'] as num).toInt());
+              },
+            ),
           if (m['sender'] == uid &&
               text.isNotEmpty &&
               (m['media_url']?.toString() ?? '').isEmpty)
@@ -383,12 +397,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           builder: (_) => Dialog(
             backgroundColor: Colors.black,
             insetPadding: EdgeInsets.zero,
-            child: InteractiveViewer(child: Image.network(url)),
+            child: InteractiveViewer(child: SignedImage(url)),
           ),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
-          child: Image.network(url, width: 220, fit: BoxFit.cover),
+          child: SignedImage(url, width: 220, fit: BoxFit.cover),
         ),
       );
     }

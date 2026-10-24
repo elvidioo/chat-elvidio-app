@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../media.dart';
+import '../report.dart';
+import '../media_url.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'compose_post_screen.dart';
@@ -206,18 +208,10 @@ class _FeedTabState extends State<FeedTab> {
         builder: (_) => Dialog(
           backgroundColor: Colors.black,
           insetPadding: EdgeInsets.zero,
-          child: InteractiveViewer(child: Image.network(url)),
+          child: InteractiveViewer(child: SignedImage(url)),
         ),
       ),
-      child: Image.network(
-        url,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const SizedBox(
-          height: 80,
-          child: Center(child: Text('Image indisponible')),
-        ),
-      ),
+      child: SignedImage(url, width: double.infinity, fit: BoxFit.cover),
     );
   }
 
@@ -331,7 +325,14 @@ class _FeedTabState extends State<FeedTab> {
             subtitle: Text(formatListTime(time), style: TextStyle(color: AppColors.muted)),
             trailing: id == uid
                 ? IconButton(onPressed: () => _delete(p), icon: const Icon(Icons.delete_outline))
-                : null,
+                : IconButton(
+                    tooltip: 'Signaler',
+                    onPressed: () => showReportDialog(context,
+                        kind: 'post',
+                        targetUser: id,
+                        targetId: (p['id'] as num).toInt()),
+                    icon: Icon(Icons.flag_outlined, color: AppColors.muted),
+                  ),
           ),
           if (text.isNotEmpty)
             Padding(

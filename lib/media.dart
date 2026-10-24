@@ -6,6 +6,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
+import 'media_url.dart';
 import 'theme.dart';
 import 'widgets.dart' show isVideoUrl;
 
@@ -40,7 +41,8 @@ String mediaLabel(String url) {
 Future<List<int>> downloadBytes(String url) async {
   final client = HttpClient();
   try {
-    final req = await client.getUrl(Uri.parse(url));
+    final real = await MediaUrl.resolve(url);
+    final req = await client.getUrl(Uri.parse(real));
     final res = await req.close();
     if (res.statusCode != 200) throw Exception('http ${res.statusCode}');
     final out = <int>[];
@@ -99,7 +101,8 @@ class _AudioBubbleState extends State<AudioBubble> {
     try {
       var c = _c;
       if (c == null) {
-        c = VideoPlayerController.networkUrl(Uri.parse(widget.url));
+        c = VideoPlayerController.networkUrl(
+            Uri.parse(await MediaUrl.resolve(widget.url)));
         _c = c;
         c.addListener(() {
           if (mounted) setState(() {});
