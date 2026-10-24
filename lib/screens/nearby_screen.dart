@@ -10,6 +10,7 @@ import 'package:nearby_connections/nearby_connections.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../relay.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -76,6 +77,9 @@ class _NearbyScreenState extends State<NearbyScreen> {
   final requested = <String>{};
   final messages = <_NearbyMessage>[];
   final seen = <String>{};
+  final engine = RelayEngine();
+  final outbox = <RelayPacket>[]; // messages envoyés sans voisin : relancés à la connexion
+  final relayed = <String, int>{}; // id -> nombre de téléphones atteints
 
   final pendingFiles = <int, String>{}; // payloadId -> uri ou chemin reçu
   final fileSenders = <int, String>{}; // payloadId -> endpointId
@@ -262,6 +266,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
     if (status == Status.CONNECTED) {
       peers[id] = endpointNames[id] ?? id;
       statusText = 'Connecté';
+      flushOutbox();
     } else {
       requested.remove(id);
     }
@@ -302,20 +307,28 @@ class _NearbyScreenState extends State<NearbyScreen> {
   }
 
   void handleText(String fromEndpoint, Uint8List bytes, String raw) {
-    try {
-      final data = jsonDecode(raw) as Map<String, dynamic>;
-      final id = data['id'].toString();
-      if (!seen.add(id)) return; // déjà reçu : on évite les boucles
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final decision = engine.receive(fromEndpoint, raw, now, onAccept: (p) {
+      if (seen.contains(p.id)) return;
+      seen.add(p.id);
       remember(_NearbyMessage(
-        id: id,
-        from: shortName(data['from'].toString()),
-        text: data['text']?.toString(),
+        id: p.id,
+        from: shortName(p.from),
+        text: p.text,
         mine: false,
+        at: DateTime.fromMillisecondsSinceEpoch(
+            p.createdMs > 0 ? p.createdMs : now),
       ));
       refresh();
-      // Relais : on transmet aux autres téléphones connectés.
-      broadcast(bytes, except: fromEndpoint);
-    } catch (_) {}
+      // Relais limité en nombre de sauts, jamais vers l'expéditeur.
+      if (engine.shouldForward(p, now)) {
+        broadcast(Uint8List.fromList(p.nextHop().encode()),
+            except: fromEndpoint);
+      }
+    });
+    if (decision == RelayDecision.rateLimited) {
+      statusText = 'Trop de messages reçus d\'un téléphone : ignorés.';
+    }
   }
 
   Future<void> finishFile(int pid) async {
@@ -364,28 +377,44 @@ class _NearbyScreenState extends State<NearbyScreen> {
   }
 
   void sendText() {
-    final text = input.text.trim();
+    var text = input.text.trim();
     if (text.isEmpty) return;
-    if (peers.isEmpty) {
-      toast('Personne de connecté pour le moment.');
-      return;
+    if (text.length > RelayPacket.maxTextLength) {
+      text = text.substring(0, RelayPacket.maxTextLength);
     }
     final id = '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 31)}';
     seen.add(id);
-    final bytes = Uint8List.fromList(utf8.encode(jsonEncode({
-      'id': id,
-      'from': uniqueName,
-      'text': text.length > 2000 ? text.substring(0, 2000) : text,
-    })));
-    broadcast(bytes);
-    remember(_NearbyMessage(
+    engine.seen.add(id);
+    final packet = RelayPacket(
       id: id,
-      from: 'Moi',
+      from: uniqueName,
       text: text,
-      mine: true,
-    ));
+      createdMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    if (peers.isEmpty) {
+      // Pas de voisin : le message attend et partira dès qu'un téléphone se connecte.
+      outbox.add(packet);
+      if (outbox.length > 50) outbox.removeAt(0);
+      toast('Personne à portée : le message partira dès qu\'un téléphone se connecte.');
+    } else {
+      relayed[id] = peers.length;
+      broadcast(Uint8List.fromList(packet.encode()));
+    }
+    remember(_NearbyMessage(id: id, from: 'Moi', text: text, mine: true));
     input.clear();
     refresh();
+  }
+
+  /// Renvoie les messages en attente (non expirés) au nouveau voisin.
+  void flushOutbox() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    outbox.removeWhere((p) => p.isExpired(now));
+    if (outbox.isEmpty || peers.isEmpty) return;
+    for (final p in List<RelayPacket>.from(outbox)) {
+      relayed[p.id] = peers.length;
+      broadcast(Uint8List.fromList(p.encode()));
+    }
+    outbox.clear();
   }
 
   Future<void> sendPhoto() async {
@@ -612,6 +641,11 @@ class _NearbyScreenState extends State<NearbyScreen> {
       avatarName: m.mine ? null : m.from,
       text: m.text,
       time: formatTime(m.at),
+      status: m.mine && m.text != null
+          ? (outbox.any((p) => p.id == m.id)
+              ? 'En attente d\'un voisin'
+              : 'Transmis à ${relayed[m.id] ?? 0} tél. (sans garantie de réception)')
+          : null,
       media: m.filePath == null
           ? null
           : ClipRRect(

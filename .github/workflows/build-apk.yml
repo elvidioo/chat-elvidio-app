@@ -133,6 +133,11 @@ jobs:
       - name: Installer les dependances
         run: flutter pub get
 
+      - name: Tests unitaires
+        run: |
+          rm -f test/widget_test.dart
+          flutter test
+
       - name: Versions des plugins
         run: |
           V=$(awk '/^  (shared_preferences|shared_preferences_android|supabase_flutter|gotrue|path_provider_android):/{n=$1} /^    version:/{if(n){printf "%s %s | ", n, $2; n=""}}' pubspec.lock)
