@@ -31,7 +31,7 @@ jobs:
           from pathlib import Path
           perms = ["INTERNET", "ACCESS_WIFI_STATE", "CHANGE_WIFI_STATE", "BLUETOOTH", "BLUETOOTH_ADMIN",
                    "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "BLUETOOTH_ADVERTISE",
-                   "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN", "NEARBY_WIFI_DEVICES", "REQUEST_INSTALL_PACKAGES", "POST_NOTIFICATIONS", "RECORD_AUDIO"]
+                   "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN", "NEARBY_WIFI_DEVICES", "REQUEST_INSTALL_PACKAGES", "POST_NOTIFICATIONS", "RECORD_AUDIO", "CAMERA", "MODIFY_AUDIO_SETTINGS"]
           mf = Path("android/app/src/main/AndroidManifest.xml")
           x = mf.read_text()
           lines = "".join('    <uses-permission android:name="android.permission.%s"/>\n' % p for p in perms)

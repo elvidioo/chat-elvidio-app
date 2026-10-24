@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
+import '../call_service.dart';
 import '../media.dart';
 import '../presence.dart';
 import '../repo.dart';
@@ -718,6 +719,20 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Appel vocal',
+            icon: const Icon(Icons.call),
+            onPressed: () => CallService.I.startCall(
+                widget.receiverId, widget.receiverName,
+                withVideo: false),
+          ),
+          IconButton(
+            tooltip: 'Appel vidéo',
+            icon: const Icon(Icons.videocam),
+            onPressed: () => CallService.I.startCall(
+                widget.receiverId, widget.receiverName,
+                withVideo: true),
+          ),
           PopupMenuButton<String>(
             onSelected: (v) {
               if (v == 'block') confirmBlock();

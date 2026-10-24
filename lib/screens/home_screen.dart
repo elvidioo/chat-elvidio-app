@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../call_service.dart';
 import '../notifications.dart';
 import '../presence.dart';
 import '../push.dart';
@@ -32,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Repo.I.start();
     LivePresence.I.start();
     Push.init();
+    CallService.I.start();
     Repo.I.touchLastSeen();
     if (AppSettings.I.notifications.value) Notifier.requestPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -50,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) Repo.I.touchLastSeen();
     if (state == AppLifecycleState.resumed) {
+      CallService.I.start();
       Repo.I.touchLastSeen();
       Repo.I.start();
       LivePresence.I.start();

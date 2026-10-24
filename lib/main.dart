@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'call_service.dart';
 import 'notifications.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
@@ -125,6 +126,7 @@ class _RootAppState extends State<RootApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     AppColors.dark = dark;
     return MaterialApp(
+      navigatorKey: CallService.navigatorKey,
       title: 'Chat Elvidio',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(AppColors.dark),
