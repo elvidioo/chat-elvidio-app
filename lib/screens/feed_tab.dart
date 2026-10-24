@@ -20,6 +20,7 @@ class _FeedTabState extends State<FeedTab> {
   late final String uid = _db.auth.currentUser!.id;
   List<Map<String, dynamic>> _posts = [];
   final Map<String, Map<String, dynamic>> _people = {};
+  final Map<int, Map<String, String>> _reacts = {};
   bool _loading = true;
   String? _error;
 
@@ -49,10 +50,107 @@ class _FeedTabState extends State<FeedTab> {
         }
       }
       _error = null;
+      await _loadReactions();
     } catch (_) {
       _error = 'Impossible de charger le fil. Vérifie ta connexion.';
     }
     if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _loadReactions() async {
+    try {
+      final ids = _posts.map((p) => p['id']).toList();
+      if (ids.isEmpty) return;
+      final r = await _db
+          .from('post_reactions')
+          .select('post_id, user_id, emoji')
+          .inFilter('post_id', ids);
+      _reacts.clear();
+      for (final e in r) {
+        (_reacts[(e['post_id'] as num).toInt()] ??= {})[e['user_id'].toString()] =
+            e['emoji'].toString();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _react(Map<String, dynamic> p, String emoji) async {
+    final id = (p['id'] as num).toInt();
+    final mine = _reacts[id]?[uid];
+    try {
+      if (mine == emoji) {
+        await _db
+            .from('post_reactions')
+            .delete()
+            .eq('post_id', id)
+            .eq('user_id', uid);
+        _reacts[id]?.remove(uid);
+      } else {
+        await _db.from('post_reactions').upsert(
+          {'post_id': id, 'user_id': uid, 'emoji': emoji},
+          onConflict: 'post_id,user_id',
+        );
+        (_reacts[id] ??= {})[uid] = emoji;
+      }
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  void _pickReaction(Map<String, dynamic> p) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      builder: (sheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (final e in const [
+                '\u{1F44D}',
+                '\u2764\uFE0F',
+                '\u{1F602}',
+                '\u{1F62E}',
+                '\u{1F622}',
+                '\u{1F64F}',
+              ])
+                GestureDetector(
+                  onTap: () {
+                    Navigator.pop(sheet);
+                    _react(p, e);
+                  },
+                  child: Text(e, style: const TextStyle(fontSize: 32)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _reactionBar(Map<String, dynamic> p) {
+    final r = _reacts[(p['id'] as num).toInt()] ?? {};
+    final counts = <String, int>{};
+    for (final e in r.values) {
+      counts[e] = (counts[e] ?? 0) + 1;
+    }
+    final summary = counts.entries
+        .map((e) => e.value > 1 ? '${e.key} ${e.value}' : e.key)
+        .join('  ');
+    final mine = r[uid];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(summary, style: const TextStyle(fontSize: 15)),
+          ),
+          TextButton(
+            onPressed: () => _pickReaction(p),
+            child: Text(mine == null ? 'Réagir' : '$mine  Modifier'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _name(String id) => id == uid
@@ -243,6 +341,7 @@ class _FeedTabState extends State<FeedTab> {
                   linkColor: AppColors.primary),
             ),
           if (url.isNotEmpty) _media(url),
+          _reactionBar(p),
         ],
       ),
     );

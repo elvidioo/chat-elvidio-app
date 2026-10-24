@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../media.dart';
@@ -35,11 +39,15 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   @override
   void initState() {
     super.initState();
+    Repo.I.activeGroup = gid;
     _loadMembers();
   }
 
   @override
   void dispose() {
+    if (Repo.I.activeGroup == gid) Repo.I.activeGroup = null;
+    _recTimer?.cancel();
+    _recorder.dispose();
     _text.dispose();
     super.dispose();
   }
@@ -56,6 +64,160 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       }
       if (mounted) setState(() {});
     } catch (_) {}
+  }
+
+  // ---- Messages vocaux ----
+  final _recorder = AudioRecorder();
+  bool _recording = false;
+  int _recSeconds = 0;
+  Timer? _recTimer;
+
+  Future<void> _startRecording() async {
+    try {
+      if (!await _recorder.hasPermission()) {
+        _toast('Autorise le microphone pour envoyer un vocal.');
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/vocal_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc),
+          path: path);
+      _recSeconds = 0;
+      _recTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _recSeconds++);
+      });
+      setState(() => _recording = true);
+    } catch (e) {
+      _toast('Enregistrement impossible : $e');
+    }
+  }
+
+  Future<void> _stopRecording({required bool send}) async {
+    _recTimer?.cancel();
+    String? path;
+    try {
+      path = await _recorder.stop();
+    } catch (_) {}
+    if (mounted) setState(() => _recording = false);
+    if (!send || path == null || _recSeconds < 1) return;
+    try {
+      setState(() => _sending = true);
+      await _upload(await File(path).readAsBytes(), 'vocal.m4a',
+          type: 'audio/mp4');
+    } catch (e) {
+      _toast('Envoi du vocal impossible ($e)');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Widget _recordingBar() {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 6),
+        child: Row(children: [
+          IconButton(
+            onPressed: () => _stopRecording(send: false),
+            icon: const Icon(Icons.delete, color: Colors.redAccent),
+          ),
+          const Icon(Icons.fiber_manual_record, color: Colors.redAccent, size: 14),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Enregistrement  ${formatDuration(Duration(seconds: _recSeconds))}',
+              style: TextStyle(color: AppColors.text),
+            ),
+          ),
+          IconButton(
+            onPressed: () => _stopRecording(send: true),
+            icon: Icon(Icons.send_rounded, color: AppColors.primary, size: 28),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  // ---- Réactions ----
+  Future<void> _react(Map<String, dynamic> m, String emoji) async {
+    final id = (m['id'] as num).toInt();
+    final mine = Repo.I.groupReactions.value[id]?[uid];
+    try {
+      if (mine == emoji) {
+        await _db
+            .from('group_message_reactions')
+            .delete()
+            .eq('message_id', id)
+            .eq('user_id', uid);
+      } else {
+        await _db.from('group_message_reactions').upsert(
+          {'message_id': id, 'user_id': uid, 'emoji': emoji},
+          onConflict: 'message_id,user_id',
+        );
+      }
+    } catch (_) {
+      _toast('Réaction impossible.');
+    }
+  }
+
+  String _reactionText(Map<String, dynamic> m) {
+    final r = Repo.I.groupReactions.value[(m['id'] as num).toInt()];
+    if (r == null || r.isEmpty) return '';
+    final counts = <String, int>{};
+    for (final e in r.values) {
+      counts[e] = (counts[e] ?? 0) + 1;
+    }
+    return counts.entries
+        .map((e) => e.value > 1 ? '${e.key} ${e.value}' : e.key)
+        .join('  ');
+  }
+
+  void _actions(Map<String, dynamic> m) {
+    final text = m['content']?.toString() ?? '';
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (sheet) => SafeArea(
+        child: Wrap(children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                for (final e in const [
+                  '\u{1F44D}',
+                  '\u2764\uFE0F',
+                  '\u{1F602}',
+                  '\u{1F62E}',
+                  '\u{1F622}',
+                  '\u{1F64F}',
+                ])
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(sheet);
+                      _react(m, e);
+                    },
+                    child: Text(e, style: const TextStyle(fontSize: 30)),
+                  ),
+              ],
+            ),
+          ),
+          if (text.isNotEmpty)
+            ListTile(
+              leading: Icon(Icons.copy, color: AppColors.primary),
+              title: const Text('Copier'),
+              onTap: () {
+                Navigator.pop(sheet);
+                Clipboard.setData(ClipboardData(text: text));
+                _toast('Message copié');
+              },
+            ),
+        ]),
+      ),
+    );
   }
 
   String _name(String id) => id == uid
@@ -250,9 +412,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ValueListenableBuilder<List<Map<String, dynamic>>>(
-              valueListenable: Repo.I.groupMessages,
-              builder: (context, all, _) {
+            child: ListenableBuilder(
+              listenable: Listenable.merge(
+                  [Repo.I.groupMessages, Repo.I.groupReactions]),
+              builder: (context, _) {
+                final all = Repo.I.groupMessages.value;
                 final msgs =
                     all.where((m) => m['group_id'] == gid).toList();
                 if (msgs.isEmpty) {
@@ -281,18 +445,14 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                     return Column(children: [
                       if (showHeader) TimeHeader(time),
                       GestureDetector(
-                        onLongPress: text.isEmpty
-                            ? null
-                            : () {
-                                Clipboard.setData(ClipboardData(text: text));
-                                _toast('Message copié');
-                              },
+                        onLongPress: () => _actions(m),
                         child: ChatBubble(
                           mine: mine,
                           sender: (!mine && !(!showHeader && _same(m, older)))
                               ? _name(sid)
                               : null,
                           text: text,
+                          reactions: _reactionText(m),
                           media: url.isEmpty
                               ? null
                               : _media(url, m['media_name']?.toString(), mine),
@@ -309,10 +469,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
             ),
           ),
           if (_sending) const LinearProgressIndicator(minHeight: 2),
-          Composer(
+          if (_recording) _recordingBar() else Composer(
             controller: _text,
             onSend: _sendText,
             onAttach: _attach,
+            onMic: _startRecording,
             sending: _sending,
           ),
         ],

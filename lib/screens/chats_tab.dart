@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../presence.dart';
+import '../media.dart';
 import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
@@ -81,7 +82,7 @@ class _ChatsTabState extends State<ChatsTab> {
     if (text.isNotEmpty) {
       body = text;
     } else if (media.isNotEmpty) {
-      body = isVideoUrl(media) ? '\u{1F3A5} Vidéo' : '\u{1F4F7} Photo';
+      body = mediaLabel(media);
     } else {
       body = '';
     }
@@ -285,7 +286,7 @@ class _ChatsTabState extends State<ChatsTab> {
           ? text
           : (media.isEmpty
               ? ''
-              : (isVideoUrl(media) ? '\u{1F3A5} Vidéo' : '\u{1F4CE} Fichier'));
+              : mediaLabel(media));
       sub = '$who : $body';
     }
     return InkWell(

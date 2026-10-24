@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
 import 'theme.dart';
+import 'widgets.dart' show isVideoUrl;
 
 const _imageExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'];
 const _audioExt = ['m4a', 'aac', 'mp3', 'ogg', 'wav'];
@@ -26,6 +27,14 @@ String fileNameOf(String url, String? name) {
   final base = clean.split('/').last;
   final m = RegExp(r'^\d{10,}_(.*)$').firstMatch(base);
   return m?.group(1) ?? base;
+}
+
+/// Étiquette courte d'un fichier (aperçus et notifications).
+String mediaLabel(String url) {
+  if (isVideoUrl(url)) return '\u{1F3A5} Vidéo';
+  if (isAudioUrl(url)) return '\u{1F3A4} Message vocal';
+  if (isImageUrl(url)) return '\u{1F4F7} Photo';
+  return '\u{1F4CE} Document';
 }
 
 Future<List<int>> downloadBytes(String url) async {

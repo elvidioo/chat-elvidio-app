@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'media.dart';
 import 'notifications.dart';
 import 'presence.dart';
 import 'settings.dart';
@@ -34,6 +35,44 @@ class Repo {
       ValueNotifier<List<Map<String, dynamic>>>(<Map<String, dynamic>>[]);
   final ValueNotifier<List<Map<String, dynamic>>> groupMessages =
       ValueNotifier<List<Map<String, dynamic>>>(<Map<String, dynamic>>[]);
+  /// Groupe actuellement ouvert (pas de notification pour lui).
+  dynamic activeGroup;
+  final Set<dynamic> _knownG = {};
+  bool _silentG = true;
+  final ValueNotifier<Map<int, Map<String, String>>> groupReactions =
+      ValueNotifier<Map<int, Map<String, String>>>({});
+  StreamSubscription<List<Map<String, dynamic>>>? _grSub;
+
+  void _onGroupData(List<Map<String, dynamic>> l) {
+    final uid = _uid;
+    for (final m in l) {
+      if (_knownG.add(m['id']) && !_silentG && m['sender'] != uid) {
+        _notifyGroup(m);
+      }
+    }
+    _silentG = false;
+    groupMessages.value = List<Map<String, dynamic>>.from(l);
+  }
+
+  void _notifyGroup(Map<String, dynamic> m) {
+    if (!AppSettings.I.notifications.value) return;
+    final life = WidgetsBinding.instance.lifecycleState;
+    if (life != null && life != AppLifecycleState.resumed) return;
+    if (activeGroup == m['group_id']) return;
+    var gname = 'Groupe';
+    for (final g in groups.value) {
+      if (g['id'] == m['group_id']) gname = g['name']?.toString() ?? gname;
+    }
+    final who = names[m['sender'].toString()] ?? 'Quelqu\'un';
+    final text = m['content']?.toString() ?? '';
+    final media = m['media_url']?.toString() ?? '';
+    Notifier.show(
+      id: 1000000000 + ((m['id'] as num).toInt() % 1000000000),
+      title: gname,
+      body: '$who : ${text.isNotEmpty ? text : (media.isEmpty ? 'Nouveau message' : mediaLabel(media))}',
+    );
+  }
+
   StreamSubscription<List<Map<String, dynamic>>>? _gmSub;
   StreamSubscription<List<Map<String, dynamic>>>? _gmemSub;
 
@@ -54,6 +93,20 @@ class Repo {
 
   void _subscribeGroups() {
     loadGroups();
+    _silentG = true;
+    _grSub?.cancel();
+    try {
+      _grSub = _db
+          .from('group_message_reactions')
+          .stream(primaryKey: ['message_id', 'user_id']).listen((rows) {
+        final m = <int, Map<String, String>>{};
+        for (final r in rows) {
+          final id = (r['message_id'] as num).toInt();
+          (m[id] ??= {})[r['user_id'].toString()] = r['emoji'].toString();
+        }
+        groupReactions.value = m;
+      }, onError: (_) {});
+    } catch (_) {}
     _gmemSub?.cancel();
     _gmSub?.cancel();
     try {
@@ -65,8 +118,7 @@ class Repo {
           .from('group_messages')
           .stream(primaryKey: ['id'])
           .order('created_at', ascending: false)
-          .listen((l) => groupMessages.value = List<Map<String, dynamic>>.from(l),
-              onError: (_) {});
+          .listen(_onGroupData, onError: (_) {});
     } catch (_) {}
   }
 
@@ -244,7 +296,7 @@ class Repo {
         ? text
         : (media.isEmpty
             ? 'Nouveau message'
-            : (isVideoUrl(media) ? '\u{1F3A5} Vidéo' : '\u{1F4F7} Photo'));
+            : mediaLabel(media));
     Notifier.show(
       id: (m['id'] as num).toInt() & 0x7fffffff,
       title: names[sender] ?? 'Nouveau message',
@@ -335,6 +387,9 @@ class Repo {
     _reactSub = null;
     await _gmSub?.cancel();
     await _gmemSub?.cancel();
+    await _grSub?.cancel();
+    groupReactions.value = {};
+    _knownG.clear();
     groups.value = [];
     groupMessages.value = [];
     reactions.value = {};

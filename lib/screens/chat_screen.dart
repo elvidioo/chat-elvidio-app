@@ -107,7 +107,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isNotEmpty) return text;
     final media = m['media_url']?.toString() ?? '';
     if (media.isEmpty) return '';
-    return isVideoUrl(media) ? '\u{1F3A5} Vidéo' : '\u{1F4F7} Photo';
+    return mediaLabel(media);
   }
 
   String nameOf(Map<String, dynamic> m) =>
