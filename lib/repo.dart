@@ -29,6 +29,48 @@ class Repo {
       ValueNotifier<Map<int, Map<String, String>>>({});
   StreamSubscription<List<Map<String, dynamic>>>? _reactSub;
 
+  /// Groupes dont je suis membre, et leurs messages (du plus récent au plus ancien).
+  final ValueNotifier<List<Map<String, dynamic>>> groups =
+      ValueNotifier<List<Map<String, dynamic>>>(<Map<String, dynamic>>[]);
+  final ValueNotifier<List<Map<String, dynamic>>> groupMessages =
+      ValueNotifier<List<Map<String, dynamic>>>(<Map<String, dynamic>>[]);
+  StreamSubscription<List<Map<String, dynamic>>>? _gmSub;
+  StreamSubscription<List<Map<String, dynamic>>>? _gmemSub;
+
+  Future<void> loadGroups() async {
+    final uid = _db.auth.currentUser?.id;
+    if (uid == null) return;
+    try {
+      final r = await _db
+          .from('group_members')
+          .select('group_id, groups(id, name, avatar_url, created_by)')
+          .eq('user_id', uid);
+      groups.value = [
+        for (final e in r)
+          if (e['groups'] != null) Map<String, dynamic>.from(e['groups'] as Map)
+      ];
+    } catch (_) {}
+  }
+
+  void _subscribeGroups() {
+    loadGroups();
+    _gmemSub?.cancel();
+    _gmSub?.cancel();
+    try {
+      _gmemSub = _db
+          .from('group_members')
+          .stream(primaryKey: ['group_id', 'user_id']).listen((_) => loadGroups(),
+              onError: (_) {});
+      _gmSub = _db
+          .from('group_messages')
+          .stream(primaryKey: ['id'])
+          .order('created_at', ascending: false)
+          .listen((l) => groupMessages.value = List<Map<String, dynamic>>.from(l),
+              onError: (_) {});
+    } catch (_) {}
+  }
+
+
   Future<void> touchLastSeen() async {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) return;
@@ -137,6 +179,7 @@ class Repo {
     }
     _subscribe();
     _subscribeReactions();
+    _subscribeGroups();
     _refreshProfiles();
     _profTimer?.cancel();
     _profTimer = Timer.periodic(
@@ -290,6 +333,10 @@ class Repo {
     _sub = null;
     await _reactSub?.cancel();
     _reactSub = null;
+    await _gmSub?.cancel();
+    await _gmemSub?.cancel();
+    groups.value = [];
+    groupMessages.value = [];
     reactions.value = {};
     _uid = null;
     _known.clear();

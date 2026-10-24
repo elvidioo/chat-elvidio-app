@@ -6,7 +6,9 @@ import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'chat_screen.dart';
+import 'create_group_screen.dart';
 import 'friends_screen.dart';
+import 'group_chat_screen.dart';
 
 /// Onglet "Discussions" façon Messenger : contacts en haut, puis les
 /// conversations avec l'aperçu du dernier message.
@@ -101,6 +103,16 @@ class _ChatsTabState extends State<ChatsTab> {
               'Discussions',
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
             ),
+          ),
+          IconButton(
+            tooltip: 'Nouveau groupe',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
+              );
+            },
+            icon: const Icon(Icons.group_add),
           ),
           ValueListenableBuilder<int>(
             valueListenable: Repo.I.pendingCount,
@@ -260,6 +272,78 @@ class _ChatsTabState extends State<ChatsTab> {
     );
   }
 
+  Widget groupTile(Map<String, dynamic> g, Map<String, dynamic>? last) {
+    final name = g['name']?.toString() ?? 'Groupe';
+    String sub = 'Nouveau groupe';
+    if (last != null) {
+      final who = last['sender'] == uid
+          ? 'Vous'
+          : (Repo.I.names[last['sender'].toString()] ?? 'Quelqu\'un');
+      final text = last['content']?.toString() ?? '';
+      final media = last['media_url']?.toString() ?? '';
+      final body = text.isNotEmpty
+          ? text
+          : (media.isEmpty
+              ? ''
+              : (isVideoUrl(media) ? '\u{1F3A5} Vidéo' : '\u{1F4CE} Fichier'));
+      sub = '$who : $body';
+    }
+    return InkWell(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => GroupChatScreen(group: g)),
+        );
+        if (mounted) setState(() {});
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.groups, color: Colors.white, size: 30),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          sub,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: AppColors.muted),
+                        ),
+                      ),
+                      if (last != null)
+                        Text(
+                          ' · ${formatListTime(created(last))}',
+                          style: TextStyle(color: AppColors.muted),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget message(IconData icon, String title, String subtitle,
       {VoidCallback? onRetry}) {
     return Padding(
@@ -303,19 +387,35 @@ class _ChatsTabState extends State<ChatsTab> {
       return query.isEmpty || name.contains(query);
     }).toList();
 
-    filtered.sort((a, b) {
-      final la = created(lastByPeer[a['id'].toString()]);
-      final lb = created(lastByPeer[b['id'].toString()]);
-      if (la != null && lb != null) return lb.compareTo(la);
-      if (la != null) return -1;
-      if (lb != null) return 1;
-      return (a['pseudo']?.toString() ?? '')
-          .compareTo(b['pseudo']?.toString() ?? '');
+    // Dernier message de chaque groupe.
+    final lastByGroup = <dynamic, Map<String, dynamic>>{};
+    for (final m in Repo.I.groupMessages.value) {
+      lastByGroup.putIfAbsent(m['group_id'], () => m);
+    }
+    final groupList = Repo.I.groups.value.where((g) {
+      final name = (g['name']?.toString() ?? '').toLowerCase();
+      return query.isEmpty || name.contains(query);
+    }).toList();
+
+    // Conversations et groupes dans une seule liste, du plus récent au plus ancien.
+    final entries = <_Entry>[
+      for (final p in filtered)
+        _Entry(created(lastByPeer[p['id'].toString()]),
+            p['pseudo']?.toString() ?? '', false, p, null),
+      for (final g in groupList)
+        _Entry(created(lastByGroup[g['id']]), g['name']?.toString() ?? '', true,
+            g, lastByGroup[g['id']]),
+    ];
+    entries.sort((a, b) {
+      if (a.time != null && b.time != null) return b.time!.compareTo(a.time!);
+      if (a.time != null) return -1;
+      if (b.time != null) return 1;
+      return a.name.compareTo(b.name);
     });
 
     final children = <Widget>[];
     if (query.isEmpty && all.isNotEmpty) children.add(contactsRow(all));
-    if (filtered.isEmpty) {
+    if (entries.isEmpty) {
       children.add(all.isEmpty
           ? message(
               Icons.people_outline,
@@ -324,9 +424,13 @@ class _ChatsTabState extends State<ChatsTab> {
             )
           : message(Icons.search_off, 'Aucun résultat', 'Essaie un autre nom.'));
     } else {
-      for (final p in filtered) {
-        children.add(tile(p, lastByPeer[p['id'].toString()],
-            unreadByPeer[p['id'].toString()] ?? 0));
+      for (final e in entries) {
+        if (e.group) {
+          children.add(groupTile(e.data, e.last));
+        } else {
+          children.add(tile(e.data, lastByPeer[e.data['id'].toString()],
+              unreadByPeer[e.data['id'].toString()] ?? 0));
+        }
       }
     }
     return ListView(
@@ -366,9 +470,11 @@ class _ChatsTabState extends State<ChatsTab> {
                   if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  return ValueListenableBuilder<List<Map<String, dynamic>>>(
-                    valueListenable: Repo.I.messages,
-                    builder: (context, msgs, _) => body(snapshot.data!, msgs),
+                  return ListenableBuilder(
+                    listenable: Listenable.merge(
+                        [Repo.I.messages, Repo.I.groups, Repo.I.groupMessages]),
+                    builder: (context, _) =>
+                        body(snapshot.data!, Repo.I.messages.value),
                   );
                 },
               ),
@@ -378,4 +484,13 @@ class _ChatsTabState extends State<ChatsTab> {
       ),
     );
   }
+}
+
+class _Entry {
+  _Entry(this.time, this.name, this.group, this.data, this.last);
+  final DateTime? time;
+  final String name;
+  final bool group;
+  final Map<String, dynamic> data;
+  final Map<String, dynamic>? last;
 }
