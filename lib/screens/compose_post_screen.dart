@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../settings.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -37,7 +38,9 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
         ? await picker.pickVideo(
             source: ImageSource.gallery, maxDuration: const Duration(minutes: 2))
         : await picker.pickImage(
-            source: ImageSource.gallery, maxWidth: 1280, imageQuality: 75);
+            source: ImageSource.gallery,
+            maxWidth: AppSettings.I.photoParams.$1,
+            imageQuality: AppSettings.I.photoParams.$2);
     if (f != null) {
       setState(() {
         _file = f;
@@ -77,6 +80,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
               Uint8List.fromList(bytes),
               fileOptions: FileOptions(contentType: f.mimeType),
             );
+    AppSettings.I.addMediaBytes(bytes.length);
         url = _db.storage.from('media').getPublicUrl(path);
         name = f.name;
       }

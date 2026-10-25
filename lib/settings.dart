@@ -14,6 +14,35 @@ class AppSettings {
   final ValueNotifier<bool> notifications = ValueNotifier<bool>(true);
   final ValueNotifier<bool> readReceipts = ValueNotifier<bool>(true);
 
+  /// Économie de données : 'low' | 'normal' | 'high' (qualité des photos envoyées)
+  final ValueNotifier<String> photoQuality = ValueNotifier<String>('normal');
+  /// Chargement des photos reçues : true = automatique, false = à la demande
+  final ValueNotifier<bool> autoPhotos = ValueNotifier<bool>(true);
+  /// Octets de médias réellement transférés (envoyés + téléchargés), mesurés.
+  final ValueNotifier<int> mediaBytes = ValueNotifier<int>(0);
+
+  /// (largeur max, qualité JPEG) selon le réglage.
+  (double, int) get photoParams {
+    switch (photoQuality.value) {
+      case 'low':
+        return (960, 45);
+      case 'high':
+        return (1920, 90);
+      default:
+        return (1280, 70);
+    }
+  }
+
+  void addMediaBytes(int n) {
+    mediaBytes.value += n;
+    _save();
+  }
+
+  void resetMediaBytes() {
+    mediaBytes.value = 0;
+    _save();
+  }
+
   Future<File> _file() async {
     final dir = await getApplicationSupportDirectory();
     await dir.create(recursive: true);
@@ -31,6 +60,10 @@ class AppSettings {
       }
       notifications.value = data['notifications'] != false;
       readReceipts.value = data['readReceipts'] != false;
+      final q = data['photoQuality']?.toString();
+      if (q == 'low' || q == 'normal' || q == 'high') photoQuality.value = q!;
+      autoPhotos.value = data['autoPhotos'] != false;
+      mediaBytes.value = (data['mediaBytes'] as num?)?.toInt() ?? 0;
     } catch (_) {}
   }
 
@@ -41,6 +74,9 @@ class AppSettings {
         'theme': themeMode.value,
         'notifications': notifications.value,
         'readReceipts': readReceipts.value,
+        'photoQuality': photoQuality.value,
+        'autoPhotos': autoPhotos.value,
+        'mediaBytes': mediaBytes.value,
       }));
     } catch (_) {}
   }
@@ -57,6 +93,16 @@ class AppSettings {
 
   void setReadReceipts(bool on) {
     readReceipts.value = on;
+    _save();
+  }
+
+  void setPhotoQuality(String q) {
+    photoQuality.value = q;
+    _save();
+  }
+
+  void setAutoPhotos(bool on) {
+    autoPhotos.value = on;
     _save();
   }
 }

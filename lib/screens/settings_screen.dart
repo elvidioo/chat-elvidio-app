@@ -76,6 +76,55 @@ class SettingsScreen extends StatelessWidget {
               onChanged: s.setReadReceipts,
             ),
           ),
+          section('Économie de données'),
+          ValueListenableBuilder<String>(
+            valueListenable: s.photoQuality,
+            builder: (context, q, _) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Qualité des photos envoyées'),
+                  const SizedBox(height: 8),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'low', label: Text('Légère')),
+                      ButtonSegment(value: 'normal', label: Text('Normale')),
+                      ButtonSegment(value: 'high', label: Text('Haute')),
+                    ],
+                    selected: {q},
+                    onSelectionChanged: (v) => s.setPhotoQuality(v.first),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          ValueListenableBuilder<bool>(
+            valueListenable: s.autoPhotos,
+            builder: (context, on, _) => SwitchListTile(
+              title: const Text('Charger les photos automatiquement'),
+              subtitle: Text(
+                'Désactivé : les photos se chargent quand tu les touches. Les vidéos ne se téléchargent jamais toutes seules. Une photo déjà chargée n\'est jamais retéléchargée.',
+                style: TextStyle(color: AppColors.muted),
+              ),
+              value: on,
+              onChanged: s.setAutoPhotos,
+            ),
+          ),
+          ValueListenableBuilder<int>(
+            valueListenable: s.mediaBytes,
+            builder: (context, n, _) => ListTile(
+              title: const Text('Données de médias utilisées'),
+              subtitle: Text(
+                '${(n / (1024 * 1024)).toStringAsFixed(1)} Mo envoyés et téléchargés par cette app (mesuré, hors messages texte)',
+                style: TextStyle(color: AppColors.muted),
+              ),
+              trailing: TextButton(
+                onPressed: s.resetMediaBytes,
+                child: const Text('Remettre à 0'),
+              ),
+            ),
+          ),
           section('Confidentialité'),
           ListTile(
             leading: const Icon(Icons.block),

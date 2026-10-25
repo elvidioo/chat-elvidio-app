@@ -372,6 +372,7 @@ class _ChatScreenState extends State<ChatScreen> {
           Uint8List.fromList(bytes),
           fileOptions: FileOptions(contentType: contentType),
         );
+    AppSettings.I.addMediaBytes(bytes.length);
     final url = supabase.storage.from('media').getPublicUrl(path);
     await supabase.from('messages').insert(withReply({
       'sender': uid,
@@ -392,8 +393,8 @@ class _ChatScreenState extends State<ChatScreen> {
             )
           : await picker.pickImage(
               source: ImageSource.gallery,
-              maxWidth: 1280,
-              imageQuality: 70,
+              maxWidth: AppSettings.I.photoParams.$1,
+              imageQuality: AppSettings.I.photoParams.$2,
             );
       if (file == null) return;
       setState(() => sending = true);

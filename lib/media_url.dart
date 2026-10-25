@@ -1,5 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'settings.dart';
+import 'transfer.dart';
 
 /// Fichiers du stockage Supabase : on demande un lien signé (temporaire)
 /// au lieu d'utiliser un lien public permanent.
@@ -44,7 +50,8 @@ class _Signed {
   final DateTime expires;
 }
 
-/// Image du stockage avec lien signé, indicateur de chargement et erreur.
+/// Image du stockage : cache sur le téléphone (jamais retéléchargée), lien
+/// signé, et chargement à la demande si l'économie de données est active.
 class SignedImage extends StatefulWidget {
   const SignedImage(
     this.url, {
@@ -66,39 +73,102 @@ class SignedImage extends StatefulWidget {
 }
 
 class _SignedImageState extends State<SignedImage> {
-  late Future<String> _future = MediaUrl.resolve(widget.url);
+  File? _file;
+  bool _loading = false;
+  bool _failed = false;
+  bool _checked = false;
+
+  static Future<File> _cacheFile(String url) async {
+    final dir = await getApplicationSupportDirectory();
+    final cache = Directory('${dir.path}/img_cache');
+    await cache.create(recursive: true);
+    final key = url
+        .split('/media/')
+        .last
+        .split('?')
+        .first
+        .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+    return File('${cache.path}/$key');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
 
   @override
   void didUpdateWidget(SignedImage old) {
     super.didUpdateWidget(old);
-    if (old.url != widget.url) _future = MediaUrl.resolve(widget.url);
+    if (old.url != widget.url) {
+      _file = null;
+      _failed = false;
+      _checked = false;
+      _init();
+    }
+  }
+
+  Future<void> _init() async {
+    try {
+      final f = await _cacheFile(widget.url);
+      if (await f.exists() && await f.length() > 0) {
+        if (mounted) setState(() { _file = f; _checked = true; });
+        return;
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _checked = true);
+    if (AppSettings.I.autoPhotos.value) _download();
+  }
+
+  Future<void> _download() async {
+    if (_loading) return;
+    setState(() { _loading = true; _failed = false; });
+    try {
+      final bytes = await downloadBytes(widget.url);
+      final f = await _cacheFile(widget.url);
+      await f.writeAsBytes(bytes);
+      if (mounted) setState(() => _file = f);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final box = (Widget child) => SizedBox(
+    final h = widget.height ?? widget.placeholderHeight;
+    Widget box(Widget child) => SizedBox(
           width: widget.width,
-          height: widget.height ?? widget.placeholderHeight,
+          height: h,
           child: Center(child: child),
         );
-    Widget image(String u) => Image.network(
-          u,
-          width: widget.width,
-          height: widget.height,
-          fit: widget.fit,
-          loadingBuilder: (context, child, progress) => progress == null
-              ? child
-              : box(const CircularProgressIndicator(strokeWidth: 2)),
-          errorBuilder: (_, __, ___) =>
-              box(const Icon(Icons.broken_image_outlined)),
-        );
-    final now = MediaUrl.cached(widget.url);
-    if (now != null) return image(now);
-    return FutureBuilder<String>(
-      future: _future,
-      builder: (context, snap) => snap.hasData
-          ? image(snap.data!)
-          : box(const CircularProgressIndicator(strokeWidth: 2)),
+    final f = _file;
+    if (f != null) {
+      return Image.file(
+        f,
+        width: widget.width,
+        height: widget.height,
+        fit: widget.fit,
+        errorBuilder: (_, __, ___) =>
+            box(const Icon(Icons.broken_image_outlined)),
+      );
+    }
+    if (!_checked || _loading) {
+      return box(const CircularProgressIndicator(strokeWidth: 2));
+    }
+    return InkWell(
+      onTap: _download,
+      child: box(Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_failed ? Icons.refresh : Icons.download_for_offline_outlined,
+              size: 32),
+          const SizedBox(height: 4),
+          Text(_failed ? 'Échec · réessayer' : 'Photo · toucher pour charger',
+              style: const TextStyle(fontSize: 12)),
+        ],
+      )),
     );
   }
 }

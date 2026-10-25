@@ -14,6 +14,7 @@ import '../media.dart';
 import '../media_url.dart';
 import '../report.dart';
 import '../repo.dart';
+import '../settings.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'group_info_screen.dart';
@@ -316,6 +317,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
           Uint8List.fromList(bytes),
           fileOptions: FileOptions(contentType: type),
         );
+    AppSettings.I.addMediaBytes(bytes.length);
     await _insert({
       'media_url': _db.storage.from('media').getPublicUrl(path),
       'media_name': name,
@@ -359,7 +361,9 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 source: ImageSource.gallery,
                 maxDuration: const Duration(minutes: 2))
             : await picker.pickImage(
-                source: ImageSource.gallery, maxWidth: 1280, imageQuality: 70);
+                source: ImageSource.gallery,
+            maxWidth: AppSettings.I.photoParams.$1,
+            imageQuality: AppSettings.I.photoParams.$2);
         if (f != null) await _upload(await f.readAsBytes(), f.name, type: f.mimeType);
       }
     } catch (e) {

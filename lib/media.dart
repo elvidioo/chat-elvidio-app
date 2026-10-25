@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
 import 'media_url.dart';
+import 'transfer.dart';
+export 'transfer.dart' show downloadBytes;
 import 'theme.dart';
 import 'widgets.dart' show isVideoUrl;
 
@@ -36,23 +38,6 @@ String mediaLabel(String url) {
   if (isAudioUrl(url)) return '\u{1F3A4} Message vocal';
   if (isImageUrl(url)) return '\u{1F4F7} Photo';
   return '\u{1F4CE} Document';
-}
-
-Future<List<int>> downloadBytes(String url) async {
-  final client = HttpClient();
-  try {
-    final real = await MediaUrl.resolve(url);
-    final req = await client.getUrl(Uri.parse(real));
-    final res = await req.close();
-    if (res.statusCode != 200) throw Exception('http ${res.statusCode}');
-    final out = <int>[];
-    await for (final chunk in res) {
-      out.addAll(chunk);
-    }
-    return out;
-  } finally {
-    client.close();
-  }
 }
 
 /// Télécharge et laisse choisir où l'enregistrer sur le téléphone.
