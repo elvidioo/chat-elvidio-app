@@ -45,6 +45,9 @@ jobs:
                   '        <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>\n')
           x = x.replace("</activity>", link + "    </activity>", 1)
           mf.write_text(x)
+          # Scanner QR : modèle ML Kit téléchargé par Google Play Services (APK plus léger)
+          gp = Path("android/gradle.properties")
+          gp.write_text(gp.read_text() + "\ndev.steenbakker.mobile_scanner.useUnbundled=true\n")
           for name in ("android/app/build.gradle.kts", "android/app/build.gradle"):
               f = Path(name)
               if f.exists():
@@ -205,7 +208,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -o pipefail
-          flutter build apk --release --split-per-abi --no-shrink --build-number=${{ github.run_number }} --dart-define=BUILD_NUMBER=${{ github.run_number }} --target-platform android-arm,android-arm64 --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build.log
+          flutter build apk --release --split-per-abi --no-shrink --obfuscate --split-debug-info=build/debug-info --build-number=${{ github.run_number }} --dart-define=BUILD_NUMBER=${{ github.run_number }} --target-platform android-arm,android-arm64 --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build.log
 
       - name: Afficher les erreurs de compilation
         if: failure()
