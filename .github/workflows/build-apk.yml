@@ -87,31 +87,42 @@ jobs:
               print("::warning title=Firebase::plugin google-services non applique (%d/2)" % ok)
           PY
 
-      - name: Forcer la signature avec la cle fixe
+      - name: Forcer la signature (cle privee si fournie, sinon cle fixe publique)
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           python3 - <<'PY'
-          import sys
+          import sys, os, base64
           from pathlib import Path
           ks = Path("ci/debug.keystore").resolve()
+          store_pass = "android"; key_alias = "androiddebugkey"
+          if os.environ.get("KS_B64") and os.environ.get("KS_PASS"):
+              priv = Path(os.environ["RUNNER_TEMP"]) / "release.p12"
+              priv.write_bytes(base64.b64decode(os.environ["KS_B64"]))
+              ks = priv.resolve(); store_pass = os.environ["KS_PASS"]; key_alias = "elvidio"
+              print("::notice title=Signature::cle privee utilisee")
+          else:
+              print("::warning title=Signature::cle publique du depot utilisee (aucun secret KEYSTORE_B64)")
           kts = Path("android/app/build.gradle.kts")
           groovy = Path("android/app/build.gradle")
           cfg_kts = (
               'signingConfig = signingConfigs.create("fixed") {\n'
               '                storeFile = file("%s")\n'
               '                storeType = "pkcs12"\n'
-              '                storePassword = "android"\n'
-              '                keyAlias = "androiddebugkey"\n'
-              '                keyPassword = "android"\n'
-              '            }' % ks
+              '                storePassword = "%s"\n'
+              '                keyAlias = "%s"\n'
+              '                keyPassword = "%s"\n'
+              '            }' % (ks, store_pass, key_alias, store_pass)
           )
           cfg_groovy = (
               'signingConfig signingConfigs.create("fixed") {\n'
               '                storeFile file("%s")\n'
               '                storeType "pkcs12"\n'
-              '                storePassword "android"\n'
-              '                keyAlias "androiddebugkey"\n'
-              '                keyPassword "android"\n'
-              '            }' % ks
+              '                storePassword "%s"\n'
+              '                keyAlias "%s"\n'
+              '                keyPassword "%s"\n'
+              '            }' % (ks, store_pass, key_alias, store_pass)
           )
           done = False
           if kts.exists():

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../notifications.dart';
+import '../policy_text.dart';
 import 'blocked_screen.dart';
 import 'data_saver_screen.dart';
 import '../settings.dart';
@@ -97,6 +98,26 @@ class SettingsScreen extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const BlockedScreen()),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('Politique de confidentialité'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Confidentialité')),
+                  body: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: SelectableText(
+                      privacyText.replaceAll('**', ''),
+                      style: const TextStyle(height: 1.45),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
           section('À propos'),
