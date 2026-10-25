@@ -7,10 +7,10 @@ import 'call_service.dart';
 import 'notifications.dart';
 import 'screens/auth_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/splash_view.dart';
 import 'settings.dart';
 import 'storage.dart';
 import 'theme.dart';
-import 'widgets.dart';
 
 // Clés publiques (anon) du projet chat-elvidio : elles sont faites pour être
 // dans l'app, la sécurité repose sur les règles RLS de la base. Le build peut
@@ -147,52 +147,22 @@ class BootGate extends StatefulWidget {
 class _BootGateState extends State<BootGate> {
   late Future<void> boot = Boot.ensure();
 
-  Widget _center(Widget child) => Scaffold(body: Center(child: child));
-
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
       future: boot,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _center(Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const AppLogo(),
-                const SizedBox(height: 20),
-                const Text(
-                  'Démarrage impossible',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '${snapshot.error}',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.muted),
-                ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    Boot.reset();
-                    setState(() => boot = Boot.ensure());
-                  },
-                  child: const Text('Réessayer'),
-                ),
-              ],
-            ),
-          ));
+          return SplashView(
+            error: '${snapshot.error}',
+            onRetry: () {
+              Boot.reset();
+              setState(() => boot = Boot.ensure());
+            },
+          );
         }
         if (snapshot.connectionState != ConnectionState.done) {
-          return _center(const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppLogo(),
-              SizedBox(height: 24),
-              CircularProgressIndicator(),
-            ],
-          ));
+          return const SplashView();
         }
         // La session est mémorisée : pas de reconnexion à chaque lancement.
         return Supabase.instance.client.auth.currentSession != null

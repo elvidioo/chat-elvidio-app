@@ -40,12 +40,12 @@ String formatHeaderTime(DateTime date) {
 
 Color _avatarColor(String name) {
   const palette = [
-    Color(0xFF0084FF),
-    Color(0xFF7C4DFF),
-    Color(0xFFFF6D91),
-    Color(0xFFFFA726),
-    Color(0xFF26C6A0),
-    Color(0xFF5C7CFA),
+    Color(0xFF087A46),
+    Color(0xFF0E7C86),
+    Color(0xFF8A6D12),
+    Color(0xFF4F7F2A),
+    Color(0xFF1F7A6B),
+    Color(0xFF6B5B1F),
   ];
   final hash = name.codeUnits.fold<int>(0, (a, b) => (a * 31 + b) & 0x7fffffff);
   return palette[hash % palette.length];
@@ -138,6 +138,7 @@ class Avatar extends StatelessWidget {
   }
 }
 
+/// Logo : médaillon vert, anneau d'or et « E » — lisible dès 24 px.
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, this.size = 88});
 
@@ -145,14 +146,27 @@ class AppLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: AppColors.gradient,
+    return Semantics(
+      label: 'Chat Elvidio',
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: AppColors.gradient,
+          border: Border.all(color: AppColors.gold, width: size * 0.045),
+        ),
+        child: Text(
+          'E',
+          style: TextStyle(
+            fontSize: size * 0.52,
+            height: 1,
+            fontWeight: FontWeight.w900,
+            color: AppColors.gold,
+          ),
+        ),
       ),
-      child: Icon(Icons.forum_rounded, size: size * 0.5, color: Colors.white),
     );
   }
 }

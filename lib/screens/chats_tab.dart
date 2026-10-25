@@ -7,16 +7,27 @@ import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'chat_screen.dart';
+import '../settings.dart';
+import 'communities_screen.dart';
 import 'create_group_screen.dart';
+import 'search_screen.dart';
+import 'stories_strip.dart';
 import 'friends_screen.dart';
 import 'group_chat_screen.dart';
 
 /// Onglet "Discussions" façon Messenger : contacts en haut, puis les
 /// conversations avec l'aperçu du dernier message.
 class ChatsTab extends StatefulWidget {
-  const ChatsTab({super.key, required this.onOpenProfile});
+  const ChatsTab({
+    super.key,
+    required this.onOpenProfile,
+    required this.onOpenNearby,
+    required this.onOpenStories,
+  });
 
   final VoidCallback onOpenProfile;
+  final VoidCallback onOpenNearby;
+  final VoidCallback onOpenStories;
 
   @override
   State<ChatsTab> createState() => _ChatsTabState();
@@ -91,7 +102,7 @@ class _ChatsTabState extends State<ChatsTab> {
 
   Widget header() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
       child: Row(
         children: [
           GestureDetector(
@@ -99,21 +110,33 @@ class _ChatsTabState extends State<ChatsTab> {
             child: Avatar(name: myPseudo ?? '?', size: 40, userId: uid),
           ),
           const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Discussions',
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+          Expanded(
+            child: Text.rich(
+              TextSpan(children: [
+                TextSpan(
+                    text: 'Chat ', style: TextStyle(color: AppColors.text)),
+                TextSpan(
+                    text: 'Elvidio',
+                    style: TextStyle(color: AppColors.goldText)),
+              ]),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
           ),
           IconButton(
-            tooltip: 'Nouveau groupe',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const CreateGroupScreen()),
-              );
-            },
-            icon: const Icon(Icons.group_add),
+            tooltip: 'Rechercher',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SearchScreen()),
+            ),
+            icon: const Icon(Icons.search_rounded),
+          ),
+          IconButton(
+            tooltip: 'Communautés',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CommunitiesScreen()),
+            ),
+            icon: const Icon(Icons.groups_rounded),
           ),
           ValueListenableBuilder<int>(
             valueListenable: Repo.I.pendingCount,
@@ -123,7 +146,7 @@ class _ChatsTabState extends State<ChatsTab> {
               icon: Badge(
                 isLabelVisible: n > 0,
                 label: Text('$n'),
-                child: const Icon(Icons.person_add_alt_1),
+                child: const Icon(Icons.person_add_alt_1_rounded),
               ),
             ),
           ),
@@ -132,16 +155,58 @@ class _ChatsTabState extends State<ChatsTab> {
     );
   }
 
-  Widget searchBar() {
+  /// Rappel discret : économie de données active (réglages réellement appliqués).
+  Widget dataSaverChip() {
+    return ListenableBuilder(
+      listenable: Listenable.merge(
+          [AppSettings.I.autoPhotos, AppSettings.I.photoQuality]),
+      builder: (context, _) {
+        final on = !AppSettings.I.autoPhotos.value ||
+            AppSettings.I.photoQuality.value == 'low';
+        if (!on) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Chip(
+              avatar: Icon(Icons.eco_rounded, size: 16, color: AppColors.primary),
+              label: const Text('Économie de données active',
+                  style: TextStyle(fontSize: 12)),
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget nearbyBanner() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: TextField(
-        controller: search,
-        onChanged: (v) => setState(() => query = v.trim().toLowerCase()),
-        decoration: InputDecoration(
-          hintText: 'Rechercher',
-          prefixIcon: Icon(Icons.search, color: AppColors.muted),
-          isDense: true,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          onTap: widget.onOpenNearby,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(color: AppColors.surface2),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.sensors_rounded, color: AppColors.primary),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('À proximité · discuter sans internet',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+                Icon(Icons.chevron_right, color: AppColors.muted),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -415,6 +480,8 @@ class _ChatsTabState extends State<ChatsTab> {
     });
 
     final children = <Widget>[];
+    children.add(StoriesStrip(onOpenStories: widget.onOpenStories));
+    children.add(nearbyBanner());
     if (query.isEmpty && all.isNotEmpty) children.add(contactsRow(all));
     if (entries.isEmpty) {
       children.add(all.isEmpty
@@ -447,7 +514,7 @@ class _ChatsTabState extends State<ChatsTab> {
       child: Column(
         children: [
           header(),
-          searchBar(),
+          dataSaverChip(),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {

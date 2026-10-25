@@ -21,26 +21,34 @@ class _Palette {
 }
 
 const _light = _Palette(
-  bg: Color(0xFFFFFFFF),
-  surface: Color(0xFFF0F2F5),
-  surface2: Color(0xFFE4E6EB),
-  primary: Color(0xFF0084FF),
-  muted: Color(0xFF65676B),
-  text: Color(0xFF050505),
-  bubbleTheirs: Color(0xFFF0F0F0),
+  bg: Color(0xFFF6F8F5),
+  surface: Color(0xFFFFFFFF),
+  surface2: Color(0xFFE3ECE6),
+  primary: Color(0xFF087A46),
+  muted: Color(0xFF58695F),
+  text: Color(0xFF17231C),
+  bubbleTheirs: Color(0xFFE6EEE8),
 );
 
 const _dark = _Palette(
-  bg: Color(0xFF18191A),
-  surface: Color(0xFF242526),
-  surface2: Color(0xFF3A3B3C),
-  primary: Color(0xFF2D88FF),
-  muted: Color(0xFFB0B3B8),
-  text: Color(0xFFE4E6EB),
-  bubbleTheirs: Color(0xFF3A3B3C),
+  bg: Color(0xFF07130F),
+  surface: Color(0xFF10231B),
+  surface2: Color(0xFF1B3428),
+  primary: Color(0xFF20A568),
+  muted: Color(0xFF9DB3A6),
+  text: Color(0xFFE8F2EC),
+  bubbleTheirs: Color(0xFF183226),
 );
 
-/// Couleurs de l'app (Messenger). `dark` est mis à jour par RootApp quand le
+/// Espacements, rayons et durées communs (design system).
+class AppSpacing {
+  static const xs = 4.0, sm = 8.0, md = 12.0, lg = 16.0, xl = 24.0;
+  static const radiusSm = 12.0, radiusMd = 18.0, radiusLg = 26.0;
+  static const fast = Duration(milliseconds: 180);
+  static const normal = Duration(milliseconds: 280);
+}
+
+/// Couleurs de l'app (vert & or). `dark` est mis à jour par RootApp quand le
 /// thème change, puis tout l'arbre de widgets est reconstruit.
 class AppColors {
   static bool dark = false;
@@ -56,10 +64,17 @@ class AppColors {
   static Color get text => _p.text;
   static Color get bubbleTheirs => _p.bubbleTheirs;
   static Color get violet => const Color(0xFF7C4DFF);
-  static Color get online => const Color(0xFF31A24C);
+  static Color get online => const Color(0xFF31C46E);
 
-  static LinearGradient get gradient => LinearGradient(
-        colors: [const Color(0xFF0099FF), _p.primary],
+  /// Or : accent (remplissages, anneaux). Pour du texte sur fond clair,
+  /// utiliser [goldText] (contraste suffisant).
+  static const gold = Color(0xFFD4AF37);
+  static Color get goldText =>
+      dark ? const Color(0xFFD4AF37) : const Color(0xFF8A6D12);
+  static const deepGreen = Color(0xFF063B2B);
+
+  static LinearGradient get gradient => const LinearGradient(
+        colors: [Color(0xFF087A46), Color(0xFF0B9455)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
@@ -73,6 +88,8 @@ ThemeData buildTheme(bool dark) {
   ).copyWith(
     primary: p.primary,
     onPrimary: Colors.white,
+    secondary: AppColors.gold,
+    onSecondary: const Color(0xFF07130F),
     surface: p.bg,
     onSurface: p.text,
   );
@@ -122,8 +139,26 @@ ThemeData buildTheme(bool dark) {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: p.bg,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: dark ? const Color(0xFF263951) : const Color(0xFFE7F3FF),
+      indicatorColor: dark ? const Color(0xFF1B3428) : const Color(0xFFDDEFE3),
     ),
+    switchTheme: SwitchThemeData(
+      thumbColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? AppColors.gold : p.muted),
+      trackColor: WidgetStateProperty.resolveWith((s) =>
+          s.contains(WidgetState.selected)
+              ? p.primary
+              : p.surface2),
+    ),
+    cardTheme: CardThemeData(
+      color: p.surface,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        side: BorderSide(color: p.surface2),
+      ),
+    ),
+    dividerTheme: DividerThemeData(color: p.surface2, space: 1),
     dialogTheme: DialogThemeData(
       backgroundColor: p.surface,
       surfaceTintColor: Colors.transparent,
@@ -134,7 +169,7 @@ ThemeData buildTheme(bool dark) {
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      backgroundColor: dark ? p.surface2 : const Color(0xFF323436),
+      backgroundColor: dark ? p.surface2 : const Color(0xFF17231C),
       contentTextStyle: const TextStyle(color: Colors.white),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),

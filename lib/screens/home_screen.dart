@@ -8,7 +8,9 @@ import '../push.dart';
 import '../repo.dart';
 import '../settings.dart';
 import '../updater.dart';
+import 'app_nav_bar.dart';
 import 'chats_tab.dart';
+import 'new_chat_sheet.dart';
 import 'feed_tab.dart';
 import 'nearby_screen.dart';
 import 'profile_screen.dart';
@@ -82,6 +84,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final uid = supabase.auth.currentUser?.id;
     return Scaffold(
       body: IndexedStack(
         index: index,
@@ -89,9 +92,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ChatsTab(
             key: ValueKey('chats$version'),
             onOpenProfile: () => setState(() => index = 3),
+            onOpenNearby: () => setState(() => index = 1),
+            onOpenStories: () => setState(() => index = 2),
           ),
-          const FeedTab(),
           const NearbyScreen(),
+          const FeedTab(),
           ProfileScreen(
             key: ValueKey('profile$version'),
             showLogout: true,
@@ -99,30 +104,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: (i) => setState(() => index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline),
-            selectedIcon: Icon(Icons.chat_bubble),
-            label: 'Discussions',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.dynamic_feed_outlined),
-            selectedIcon: Icon(Icons.dynamic_feed),
-            label: 'Fil',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.wifi_tethering),
-            label: 'Mode proche',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.account_circle_outlined),
-            selectedIcon: Icon(Icons.account_circle),
-            label: 'Profil',
-          ),
+      bottomNavigationBar: ListenableBuilder(
+        listenable: Repo.I.messages,
+        builder: (context, _) => AppNavBar(
+        index: index,
+        onSelect: (i) => setState(() => index = i),
+        onCenter: () => showNewChatSheet(context),
+        badges: {0: Repo.I.messages.value.where((m) => m['receiver'] == uid && m['read_at'] == null).length},
+        items: const [
+          NavItem(Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded,
+              'Discussions'),
+          NavItem(Icons.sensors_rounded, Icons.sensors_rounded, 'À proximité'),
+          NavItem(Icons.auto_stories_outlined, Icons.auto_stories, 'Stories'),
+          NavItem(Icons.account_circle_outlined, Icons.account_circle,
+              'Profil'),
         ],
+      ),
       ),
     );
   }

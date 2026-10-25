@@ -133,6 +133,10 @@ jobs:
       - name: Installer les dependances
         run: flutter pub get
 
+      - name: Analyse Flutter
+        continue-on-error: true
+        run: flutter analyze --no-fatal-infos 2>&1 | tail -80
+
       - name: Tests unitaires
         run: |
           rm -f test/widget_test.dart
