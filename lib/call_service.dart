@@ -582,8 +582,10 @@ class CallService {
 
   void _startVibrate() {
     _vibrate?.cancel();
+    SystemSound.play(SystemSoundType.alert);
     _vibrate = Timer.periodic(const Duration(milliseconds: 1500), (_) {
       HapticFeedback.vibrate();
+      SystemSound.play(SystemSoundType.alert);
     });
   }
 

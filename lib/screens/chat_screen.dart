@@ -139,6 +139,34 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  /// Cache tous les messages actuels de cette discussion, sur ce téléphone seulement.
+  Future<void> _clearChat() async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Vider la discussion ?'),
+        content: const Text(
+            'Les messages disparaissent de ton téléphone. L\'autre personne les garde.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Vider')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final keys = Repo.I.messages.value
+        .where((m) =>
+            (m['sender'] == uid && m['receiver'] == widget.receiverId) ||
+            (m['sender'] == widget.receiverId && m['receiver'] == uid))
+        .map((m) => 'm:${m['id']}');
+    AppSettings.I.hideMessages(keys);
+  }
+
   Future<void> confirmBlock() async {
     final yes = await showDialog<bool>(
       context: context,
@@ -766,12 +794,14 @@ class _ChatScreenState extends State<ChatScreen> {
           PopupMenuButton<String>(
             onSelected: (v) {
               if (v == 'block') confirmBlock();
+              if (v == 'clear') _clearChat();
               if (v == 'report') {
                 showReportDialog(context,
                     kind: 'user', targetUser: widget.receiverId);
               }
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(value: 'clear', child: Text('Vider la discussion')),
               PopupMenuItem(value: 'report', child: Text('Signaler')),
               PopupMenuItem(value: 'block', child: Text('Bloquer')),
             ],

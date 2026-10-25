@@ -128,9 +128,13 @@ class Repo {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) return;
     try {
+      // Statut masqué : on n'écrit plus d'heure de connexion (valeur vide).
+      final hide = AppSettings.I.hideStatus.value;
       await _db
           .from('profiles')
-          .update({'last_seen': DateTime.now().toUtc().toIso8601String()})
+          .update({
+            'last_seen': hide ? null : DateTime.now().toUtc().toIso8601String()
+          })
           .eq('id', uid);
     } catch (_) {}
   }

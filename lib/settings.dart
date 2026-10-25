@@ -13,6 +13,8 @@ class AppSettings {
   final ValueNotifier<String> themeMode = ValueNotifier<String>('system');
   final ValueNotifier<bool> notifications = ValueNotifier<bool>(true);
   final ValueNotifier<bool> readReceipts = ValueNotifier<bool>(true);
+  /// Masquer mon statut « en ligne », « en train d'écrire » et « vu à ».
+  final ValueNotifier<bool> hideStatus = ValueNotifier<bool>(false);
 
   /// Économie de données : 'low' | 'normal' | 'high' (qualité des photos envoyées)
   final ValueNotifier<String> photoQuality = ValueNotifier<String>('normal');
@@ -77,6 +79,7 @@ class AppSettings {
       }
       notifications.value = data['notifications'] != false;
       readReceipts.value = data['readReceipts'] != false;
+      hideStatus.value = data['hideStatus'] == true;
       final q = data['photoQuality']?.toString();
       if (q == 'low' || q == 'normal' || q == 'high') photoQuality.value = q!;
       autoPhotos.value = data['autoPhotos'] != false;
@@ -93,6 +96,7 @@ class AppSettings {
         'theme': themeMode.value,
         'notifications': notifications.value,
         'readReceipts': readReceipts.value,
+        'hideStatus': hideStatus.value,
         'photoQuality': photoQuality.value,
         'autoPhotos': autoPhotos.value,
         'mediaBytes': mediaBytes.value,
@@ -109,6 +113,17 @@ class AppSettings {
 
   void setNotifications(bool on) {
     notifications.value = on;
+    _save();
+  }
+
+  void setHideStatus(bool on) {
+    hideStatus.value = on;
+    _save();
+  }
+
+  /// Cache d'un coup une liste de messages (« vider la discussion »).
+  void hideMessages(Iterable<String> keys) {
+    hidden.value = {...hidden.value, ...keys};
     _save();
   }
 

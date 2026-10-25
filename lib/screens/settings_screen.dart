@@ -5,7 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../call_service.dart';
+import '../push.dart';
 import '../repo.dart';
+import 'auth_screen.dart';
 
 import '../notifications.dart';
 import '../policy_text.dart';
@@ -85,6 +90,22 @@ class SettingsScreen extends StatelessWidget {
               onChanged: s.setReadReceipts,
             ),
           ),
+          ValueListenableBuilder<bool>(
+            valueListenable: s.hideStatus,
+            builder: (context, on, _) => SwitchListTile(
+              title: const Text('Masquer mon statut'),
+              subtitle: Text(
+                'Les autres ne voient plus quand tu es en ligne, ni « Vu à… », ni quand tu écris.',
+                style: TextStyle(color: AppColors.muted),
+              ),
+              value: on,
+              onChanged: (v) {
+                s.setHideStatus(v);
+                LivePresence.I.applyVisibility();
+                Repo.I.touchLastSeen();
+              },
+            ),
+          ),
           section('Économie de données'),
           ListTile(
             leading: Icon(Icons.eco_rounded, color: AppColors.primary),
@@ -107,6 +128,17 @@ class SettingsScreen extends StatelessWidget {
               style: TextStyle(color: AppColors.muted),
             ),
             onTap: () => _exportChats(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_forever_outlined,
+                color: Colors.redAccent),
+            title: const Text('Supprimer mon compte',
+                style: TextStyle(color: Colors.redAccent)),
+            subtitle: Text(
+              'Efface définitivement ton profil, tes messages, tes fichiers et tes publications.',
+              style: TextStyle(color: AppColors.muted),
+            ),
+            onTap: () => _deleteAccount(context),
           ),
           section('Confidentialité'),
           ListTile(
@@ -192,5 +224,61 @@ Future<void> _exportChats(BuildContext context) async {
   } catch (e) {
     messenger.showSnackBar(
         const SnackBar(content: Text('Export impossible.')));
+  }
+}
+
+Future<void> _deleteAccount(BuildContext context) async {
+  final nav = Navigator.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final ctrl = TextEditingController();
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: const Text('Supprimer ton compte ?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+              'C\'est définitif : profil, messages, fichiers et publications seront effacés. Les groupes que tu as créés restent, gérés par un autre membre.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            decoration: const InputDecoration(hintText: 'Écris SUPPRIMER pour confirmer'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Annuler')),
+        TextButton(
+            onPressed: () =>
+                Navigator.pop(c, ctrl.text.trim().toUpperCase() == 'SUPPRIMER'),
+            child: const Text('Supprimer',
+                style: TextStyle(color: Colors.redAccent))),
+      ],
+    ),
+  );
+  ctrl.dispose();
+  if (ok != true) return;
+  try {
+    final db = Supabase.instance.client;
+    final res = await db.functions.invoke('delete-account');
+    if (res.status != 200) throw Exception('http ${res.status}');
+    CallService.I.stop();
+    await Push.logout();
+    LivePresence.I.stop();
+    await Repo.I.stop();
+    try {
+      await db.auth.signOut();
+    } catch (_) {}
+    nav.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
+      (_) => false,
+    );
+  } catch (_) {
+    messenger.showSnackBar(const SnackBar(
+        content: Text('Suppression impossible. Vérifie ta connexion et réessaie.')));
   }
 }

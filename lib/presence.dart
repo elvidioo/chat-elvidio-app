@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'settings.dart';
+
 /// Statut "en ligne", "est en train d'écrire" et photos de profil.
 class LivePresence {
   LivePresence._();
@@ -67,9 +69,22 @@ class LivePresence {
     }).subscribe((st, [error]) async {
       this.status.value = error == null ? st.name : '${st.name}: $error';
       if (st == RealtimeSubscribeStatus.subscribed) {
-        await ch.track({'typing_to': _typingTo});
+        applyVisibility();
       }
     });
+  }
+
+  /// Montre ou cache ma présence selon le réglage « Masquer mon statut ».
+  Future<void> applyVisibility() async {
+    final ch = _ch;
+    if (ch == null) return;
+    try {
+      if (AppSettings.I.hideStatus.value) {
+        await ch.untrack();
+      } else {
+        await ch.track({'typing_to': _typingTo});
+      }
+    } catch (_) {}
   }
 
   /// Dit aux autres que j'écris (ou plus) à [peer].
@@ -80,6 +95,7 @@ class LivePresence {
     }
     if (_typingTo == peer) return;
     _typingTo = peer;
+    if (AppSettings.I.hideStatus.value) return;
     try {
       _ch?.track({'typing_to': peer});
     } catch (_) {}

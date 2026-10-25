@@ -13,7 +13,7 @@ Dernière mise à jour : 25 octobre 2026. Contact : ouvrir une « issue » sur h
 
 **Services tiers** : Supabase (comptes, messages, fichiers), Firebase Cloud Messaging de Google (notifications), serveurs STUN/TURN gratuits (appels).
 
-**Tes droits** : tu peux modifier ton profil, bloquer ou signaler un utilisateur, te déconnecter. Pour supprimer ton compte et tes données, demande-le via le contact ci-dessus.
+**Tes droits** : tu peux modifier ton profil, bloquer ou signaler un utilisateur, te déconnecter. Tu peux supprimer ton compte et tes données toi-même : Paramètres → Supprimer mon compte (profil, messages, fichiers et publications effacés ; tu peux aussi masquer ton statut en ligne).
 
 **Règles d'usage** : pas de harcèlement, de contenu illégal ou de spam. Les comptes abusifs peuvent être suspendus.
 ''';
