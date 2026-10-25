@@ -254,7 +254,9 @@ class _ChatsTabState extends State<ChatsTab> {
     final name = profile['pseudo']?.toString() ?? 'Utilisateur';
     final unread =
         last != null && last['sender'] != uid && last['read_at'] == null;
+    final pinned = AppSettings.I.pinned.value.contains('u:${profile['id']}');
     return InkWell(
+      onLongPress: () => AppSettings.I.togglePin('u:${profile['id']}'),
       onTap: () => openChat(profile['id'].toString(), name),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -281,6 +283,8 @@ class _ChatsTabState extends State<ChatsTab> {
                     ),
                   ),
                   const SizedBox(height: 2),
+                  if (pinned)
+                    Icon(Icons.push_pin, size: 14, color: AppColors.goldText),
                   if (last == null)
                     Text(
                       'Dis bonjour \u{1F44B}',
@@ -353,6 +357,7 @@ class _ChatsTabState extends State<ChatsTab> {
       sub = '$who : $body';
     }
     return InkWell(
+      onLongPress: () => AppSettings.I.togglePin('g:${g['id']}'),
       onTap: () async {
         await Navigator.push(
           context,
@@ -470,7 +475,11 @@ class _ChatsTabState extends State<ChatsTab> {
         _Entry(created(lastByGroup[g['id']]), g['name']?.toString() ?? '', true,
             g, lastByGroup[g['id']]),
     ];
+    bool isPinned(_Entry e) => AppSettings.I.pinned.value
+        .contains(e.group ? 'g:${e.data['id']}' : 'u:${e.data['id']}');
     entries.sort((a, b) {
+      final pa = isPinned(a), pb = isPinned(b);
+      if (pa != pb) return pa ? -1 : 1;
       if (a.time != null && b.time != null) return b.time!.compareTo(a.time!);
       if (a.time != null) return -1;
       if (b.time != null) return 1;
@@ -537,8 +546,12 @@ class _ChatsTabState extends State<ChatsTab> {
                     return const Center(child: CircularProgressIndicator());
                   }
                   return ListenableBuilder(
-                    listenable: Listenable.merge(
-                        [Repo.I.messages, Repo.I.groups, Repo.I.groupMessages]),
+                    listenable: Listenable.merge([
+                      Repo.I.messages,
+                      Repo.I.groups,
+                      Repo.I.groupMessages,
+                      AppSettings.I.pinned
+                    ]),
                     builder: (context, _) =>
                         body(snapshot.data!, Repo.I.messages.value),
                   );

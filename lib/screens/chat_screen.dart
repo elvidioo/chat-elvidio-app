@@ -74,6 +74,39 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> deleteForEveryone(Map<String, dynamic> m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Supprimer pour tous ?'),
+        content: const Text(
+            'Le message disparaîtra aussi chez l\'autre personne. Action définitive.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final rows = await supabase
+          .from('messages')
+          .delete()
+          .eq('id', m['id'])
+          .eq('sender', uid)
+          .select('id');
+      if ((rows as List).isEmpty) {
+        toast('Suppression impossible.');
+      }
+    } catch (_) {
+      toast('Suppression impossible (connexion ?).');
+    }
+  }
+
   Future<void> editMessage(Map<String, dynamic> m) async {
     final ctrl = TextEditingController(text: m['content']?.toString() ?? '');
     final value = await showDialog<String>(
@@ -236,6 +269,25 @@ class _ChatScreenState extends State<ChatScreen> {
                   Navigator.pop(sheet);
                   Clipboard.setData(ClipboardData(text: text));
                   toast('Message copié');
+                },
+              ),
+            ListTile(
+              leading: Icon(Icons.visibility_off_outlined, color: AppColors.muted),
+              title: const Text('Supprimer pour moi'),
+              onTap: () {
+                Navigator.pop(sheet);
+                AppSettings.I.hideMessage('m:${m['id']}');
+                toast('Message masqué sur ce téléphone');
+              },
+            ),
+            if (m['sender'] == uid)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                title: const Text('Supprimer pour tous',
+                    style: TextStyle(color: Colors.redAccent)),
+                onTap: () {
+                  Navigator.pop(sheet);
+                  deleteForEveryone(m);
                 },
               ),
           ],
@@ -736,7 +788,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: ListenableBuilder(
               listenable:
                   Listenable.merge(
-                      [Repo.I.messages, Repo.I.reactions, Repo.I.outbox]),
+                      [Repo.I.messages, Repo.I.reactions, Repo.I.outbox, AppSettings.I.hidden]),
               builder: (context, _) {
                 final all = Repo.I.messages.value;
                 // Du plus récent au plus ancien (liste inversée).
@@ -745,10 +797,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   ...Repo.I.outbox.value
                       .where((m) => m['receiver'] == widget.receiverId),
                   ...all.where((m) =>
-                        (m['sender'] == uid &&
+                        !AppSettings.I.hidden.value.contains('m:${m['id']}') &&
+                        ((m['sender'] == uid &&
                             m['receiver'] == widget.receiverId) ||
                         (m['sender'] == widget.receiverId &&
-                            m['receiver'] == uid)),
+                            m['receiver'] == uid))),
                 ];
                 for (var i = 0; i < messages.length; i++) {
                   if (messages[i]['sender'] == uid) {

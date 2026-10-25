@@ -18,6 +18,23 @@ class AppSettings {
   final ValueNotifier<String> photoQuality = ValueNotifier<String>('normal');
   /// Chargement des photos reçues : true = automatique, false = à la demande
   final ValueNotifier<bool> autoPhotos = ValueNotifier<bool>(true);
+  /// Messages cachés « pour moi » : clés 'm:<id>' (privé) ou 'g:<id>' (groupe).
+  final ValueNotifier<Set<String>> hidden = ValueNotifier<Set<String>>({});
+  /// Conversations épinglées : 'u:<id>' (contact) ou 'g:<id>' (groupe).
+  final ValueNotifier<Set<String>> pinned = ValueNotifier<Set<String>>({});
+
+  void hideMessage(String key) {
+    hidden.value = {...hidden.value, key};
+    _save();
+  }
+
+  void togglePin(String key) {
+    final s = {...pinned.value};
+    if (!s.remove(key)) s.add(key);
+    pinned.value = s;
+    _save();
+  }
+
   /// Octets de médias réellement transférés (envoyés + téléchargés), mesurés.
   final ValueNotifier<int> mediaBytes = ValueNotifier<int>(0);
 
@@ -64,6 +81,8 @@ class AppSettings {
       if (q == 'low' || q == 'normal' || q == 'high') photoQuality.value = q!;
       autoPhotos.value = data['autoPhotos'] != false;
       mediaBytes.value = (data['mediaBytes'] as num?)?.toInt() ?? 0;
+      hidden.value = {for (final e in (data['hidden'] as List? ?? [])) e.toString()};
+      pinned.value = {for (final e in (data['pinned'] as List? ?? [])) e.toString()};
     } catch (_) {}
   }
 
@@ -77,6 +96,8 @@ class AppSettings {
         'photoQuality': photoQuality.value,
         'autoPhotos': autoPhotos.value,
         'mediaBytes': mediaBytes.value,
+        'hidden': hidden.value.toList(),
+        'pinned': pinned.value.toList(),
       }));
     } catch (_) {}
   }

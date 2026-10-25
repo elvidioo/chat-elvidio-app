@@ -1,4 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../repo.dart';
 
 import '../notifications.dart';
 import '../policy_text.dart';
@@ -90,6 +97,17 @@ class SettingsScreen extends StatelessWidget {
               MaterialPageRoute(builder: (_) => const DataSaverScreen()),
             ),
           ),
+          section('Mes données'),
+          ListTile(
+            leading: Icon(Icons.download_for_offline_outlined,
+                color: AppColors.primary),
+            title: const Text('Exporter mes discussions'),
+            subtitle: Text(
+              'Crée un fichier avec les messages chargés sur ce téléphone. Tes messages restent aussi sur ton compte : ils reviennent quand tu te reconnectes.',
+              style: TextStyle(color: AppColors.muted),
+            ),
+            onTap: () => _exportChats(context),
+          ),
           section('Confidentialité'),
           ListTile(
             leading: const Icon(Icons.block),
@@ -143,5 +161,36 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+Future<void> _exportChats(BuildContext context) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final names = Repo.I.names;
+    final rows = [
+      for (final m in Repo.I.messages.value)
+        {
+          'date': m['created_at'],
+          'de': names[m['sender'].toString()] ?? m['sender'],
+          'a': names[m['receiver'].toString()] ?? m['receiver'],
+          'texte': m['content'],
+          'fichier': m['media_name'] ?? (m['media_url'] != null ? 'média' : null),
+        }
+    ];
+    if (rows.isEmpty) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Aucun message à exporter.')));
+      return;
+    }
+    final dir = await getTemporaryDirectory();
+    final f = File('${dir.path}/chat-elvidio-discussions.json');
+    await f.writeAsString(
+        const JsonEncoder.withIndent('  ').convert(rows));
+    await Share.shareXFiles([XFile(f.path)],
+        text: 'Mes discussions Chat Elvidio');
+  } catch (e) {
+    messenger.showSnackBar(
+        const SnackBar(content: Text('Export impossible.')));
   }
 }

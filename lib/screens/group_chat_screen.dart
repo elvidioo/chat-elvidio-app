@@ -263,6 +263,25 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                 _edit(m);
               },
             ),
+          ListTile(
+            leading: Icon(Icons.visibility_off_outlined, color: AppColors.muted),
+            title: const Text('Supprimer pour moi'),
+            onTap: () {
+              Navigator.pop(sheet);
+              AppSettings.I.hideMessage('g:${m['id']}');
+              _toast('Message masqué sur ce téléphone');
+            },
+          ),
+          if (m['sender'] == uid)
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text('Supprimer pour tous',
+                  style: TextStyle(color: Colors.redAccent)),
+              onTap: () {
+                Navigator.pop(sheet);
+                _deleteForAll(m);
+              },
+            ),
           if (text.isNotEmpty)
             ListTile(
               leading: Icon(Icons.copy, color: AppColors.primary),
@@ -322,6 +341,32 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
       'media_url': _db.storage.from('media').getPublicUrl(path),
       'media_name': name,
     });
+  }
+
+  Future<void> _deleteForAll(Map<String, dynamic> m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Supprimer pour tous ?'),
+        content: const Text('Le message disparaîtra pour tout le groupe.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Supprimer')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final rows =
+          await _db.from('group_messages').delete().eq('id', m['id']).select('id');
+      if ((rows as List).isEmpty) _toast('Suppression impossible.');
+    } catch (_) {
+      _toast('Suppression impossible (connexion ?).');
+    }
   }
 
   Future<void> _attach() async {
@@ -474,12 +519,19 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
         children: [
           Expanded(
             child: ListenableBuilder(
-              listenable: Listenable.merge(
-                  [Repo.I.groupMessages, Repo.I.groupReactions]),
+              listenable: Listenable.merge([
+                Repo.I.groupMessages,
+                Repo.I.groupReactions,
+                AppSettings.I.hidden
+              ]),
               builder: (context, _) {
                 final all = Repo.I.groupMessages.value;
                 final msgs =
-                    all.where((m) => m['group_id'] == gid).toList();
+                    all
+                        .where((m) =>
+                            m['group_id'] == gid &&
+                            !AppSettings.I.hidden.value.contains('g:${m['id']}'))
+                        .toList();
                 if (msgs.isEmpty) {
                   return Center(
                     child: Text('Écris le premier message \u{1F44B}',
