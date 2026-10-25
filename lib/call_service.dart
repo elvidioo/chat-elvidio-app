@@ -114,7 +114,6 @@ class CallService {
 
   RealtimeChannel? _mine;
   String? _mineUid;
-  final Map<String, Future<RealtimeChannel>> _out = {};
   RTCPeerConnection? _pc;
   MediaStream? _local;
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
@@ -130,18 +129,37 @@ class CallService {
 
   String get _uid => _db.auth.currentUser!.id;
 
-  /// À appeler une fois connecté : écoute les appels entrants.
+  /// À appeler une fois connecté : écoute les signaux d'appel qui me sont
+  /// destinés. La signalisation passe par une table (call_signals) suivie en
+  /// temps réel, plus fiable que les canaux « broadcast ».
   void start() {
     final uid = _db.auth.currentUser?.id;
     if (uid == null) return;
     if (_mine != null && _mineUid == uid) return;
     stop();
     _mineUid = uid;
-    final ch = _db.channel('calls:$uid');
-    ch.onBroadcast(event: 'signal', callback: (p) {
-      final data = p['payload'] is Map ? p['payload'] as Map : p;
-      _onSignal(Map<String, dynamic>.from(data));
-    }).subscribe((status, [error]) {
+    final ch = _db.channel('call-signals:$uid');
+    ch.onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'call_signals',
+      filter: PostgresChangeFilter(
+        type: PostgresChangeFilterType.eq,
+        column: 'receiver',
+        value: uid,
+      ),
+      callback: (change) {
+        final r = change.newRecord;
+        final payload = r['payload'];
+        final data = <String, dynamic>{
+          if (payload is Map) ...Map<String, dynamic>.from(payload),
+          'type': r['type'],
+          'from': r['sender'],
+          'callId': r['call_id'],
+        };
+        _onSignal(data);
+      },
+    ).subscribe((status, [error]) {
       // Si la connexion temps réel tombe, on se réabonne (sinon plus d'appel reçu).
       if (status == RealtimeSubscribeStatus.channelError ||
           status == RealtimeSubscribeStatus.timedOut ||
@@ -171,39 +189,27 @@ class CallService {
         _db.removeChannel(ch);
       } catch (_) {}
     }
-    for (final f in _out.values) {
-      f.then((c) {
-        try {
-          _db.removeChannel(c);
-        } catch (_) {}
-      }, onError: (_) {});
-    }
-    _out.clear();
-  }
-
-  Future<RealtimeChannel> _channelTo(String peer) {
-    return _out[peer] ??= () async {
-      final c = Completer<void>();
-      final ch = _db.channel('calls:$peer');
-      ch.subscribe((s, [e]) {
-        if (s == RealtimeSubscribeStatus.subscribed && !c.isCompleted) {
-          c.complete();
-        }
-      });
-      await c.future.timeout(const Duration(seconds: 10));
-      return ch;
-    }();
   }
 
   Future<void> _send(String peer, Map<String, dynamic> data) async {
-    try {
-      final ch = await _channelTo(peer);
-      await ch.sendBroadcastMessage(
-        event: 'signal',
-        payload: {...data, 'from': _uid},
-      );
-    } catch (_) {
-      _out.remove(peer);
+    final type = data['type']?.toString();
+    final callId = (data['callId'] ?? _callId)?.toString();
+    if (type == null || callId == null) return;
+    final payload = Map<String, dynamic>.from(data)
+      ..remove('type')
+      ..remove('callId');
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        await _db.from('call_signals').insert({
+          'call_id': callId,
+          'receiver': peer,
+          'type': type,
+          'payload': payload,
+        });
+        return;
+      } catch (_) {
+        await Future<void>.delayed(Duration(milliseconds: 300 * (attempt + 1)));
+      }
     }
   }
 
