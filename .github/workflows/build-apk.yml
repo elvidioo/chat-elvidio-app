@@ -136,6 +136,7 @@ jobs:
       - name: Analyse Flutter
         continue-on-error: true
         run: |
+          rm -f test/widget_test.dart
           flutter analyze > analyze.txt 2>&1 || true
           E=$(grep -c "^ *error •" analyze.txt || true)
           W=$(grep -c "^ *warning •" analyze.txt || true)

@@ -6,7 +6,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../settings.dart';
 import '../theme.dart';
-import '../widgets.dart';
 
 /// Écrire une publication ou un statut (visible 24 h).
 class ComposePostScreen extends StatefulWidget {

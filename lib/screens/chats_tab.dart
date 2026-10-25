@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../presence.dart';
 import '../media.dart';
 import '../repo.dart';
 import '../theme.dart';
@@ -9,7 +8,6 @@ import '../widgets.dart';
 import 'chat_screen.dart';
 import '../settings.dart';
 import 'communities_screen.dart';
-import 'create_group_screen.dart';
 import 'search_screen.dart';
 import 'stories_strip.dart';
 import 'friends_screen.dart';

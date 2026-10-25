@@ -12,7 +12,6 @@ import 'media.dart';
 import 'notifications.dart';
 import 'presence.dart';
 import 'settings.dart';
-import 'widgets.dart';
 
 /// Source unique des messages : écoute le temps réel, garde une copie sur le
 /// téléphone (visible sans internet) et déclenche les notifications.

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../media.dart';
 import '../report.dart';
 import '../media_url.dart';
 import '../theme.dart';
