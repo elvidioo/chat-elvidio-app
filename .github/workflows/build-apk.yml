@@ -36,6 +36,14 @@ jobs:
           x = mf.read_text()
           lines = "".join('    <uses-permission android:name="android.permission.%s"/>\n' % p for p in perms)
           x = x.replace("<application", lines + "    <application", 1)
+          link = ('        <intent-filter>\n'
+                  '            <action android:name="android.intent.action.VIEW"/>\n'
+                  '            <category android:name="android.intent.category.DEFAULT"/>\n'
+                  '            <category android:name="android.intent.category.BROWSABLE"/>\n'
+                  '            <data android:scheme="chatelvidio" android:host="login-callback"/>\n'
+                  '        </intent-filter>\n'
+                  '        <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>\n')
+          x = x.replace("</activity>", link + "    </activity>", 1)
           mf.write_text(x)
           for name in ("android/app/build.gradle.kts", "android/app/build.gradle"):
               f = Path(name)

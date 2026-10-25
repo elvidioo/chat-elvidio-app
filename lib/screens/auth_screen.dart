@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart' show LaunchMode;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../theme.dart';
@@ -22,6 +25,53 @@ class _AuthScreenState extends State<AuthScreen> {
   bool signup = false;
   bool hidePassword = true;
   String message = '';
+  bool googleBusy = false;
+  bool _navigated = false;
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Retour de la connexion Google (le navigateur rouvre l'app avec la session).
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((s) {
+      if (s.event == AuthChangeEvent.signedIn && s.session != null) _goHome();
+    });
+  }
+
+  void _goHome() {
+    if (_navigated || !mounted) return;
+    _navigated = true;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
+    );
+  }
+
+  Future<void> signInWithGoogle() async {
+    setState(() {
+      googleBusy = true;
+      message = '';
+    });
+    try {
+      final ok = await Supabase.instance.client.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: 'chatelvidio://login-callback',
+        authScreenLaunchMode: LaunchMode.externalApplication,
+      );
+      if (!ok && mounted) {
+        setState(() => message = 'Impossible d\'ouvrir la connexion Google.');
+      }
+    } on AuthException catch (e) {
+      if (mounted) setState(() => message = friendly(e.message));
+    } catch (_) {
+      if (mounted) {
+        setState(() => message =
+            'Connexion Google impossible (internet ? configuration ?).');
+      }
+    } finally {
+      if (mounted) setState(() => googleBusy = false);
+    }
+  }
 
   // E-mail tel quel, ou numéro de téléphone -> adresse interne (sans SMS).
   String? loginEmail(String raw) {
@@ -128,10 +178,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
       if (!mounted) return;
       if (auth.currentUser != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        _goHome();
       } else {
         setState(() => message = 'Connexion impossible. Réessaie.');
       }
@@ -149,6 +196,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    _authSub?.cancel();
     pseudo.dispose();
     identifier.dispose();
     password.dispose();
@@ -264,6 +312,30 @@ class _AuthScreenState extends State<AuthScreen> {
                     label: signup ? 'Créer mon compte' : 'Se connecter',
                     loading: loading,
                     onPressed: submit,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(children: [
+                    Expanded(child: Divider(color: AppColors.surface2)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text('ou', style: TextStyle(color: AppColors.muted)),
+                    ),
+                    Expanded(child: Divider(color: AppColors.surface2)),
+                  ]),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: (googleBusy || loading) ? null : signInWithGoogle,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                      shape: const StadiumBorder(),
+                    ),
+                    icon: googleBusy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.g_mobiledata, size: 32),
+                    label: const Text('Continuer avec Google'),
                   ),
                   const SizedBox(height: 28),
                   GestureDetector(
