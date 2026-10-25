@@ -110,6 +110,7 @@ class Avatar extends StatelessWidget {
           height: size,
           fit: BoxFit.cover,
           placeholderHeight: size,
+          alwaysLoad: true,
         ),
       );
     }

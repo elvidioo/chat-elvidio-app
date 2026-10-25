@@ -60,6 +60,7 @@ class SignedImage extends StatefulWidget {
     this.height,
     this.fit,
     this.placeholderHeight = 140,
+    this.alwaysLoad = false,
   });
 
   final String url;
@@ -67,6 +68,8 @@ class SignedImage extends StatefulWidget {
   final double? height;
   final BoxFit? fit;
   final double placeholderHeight;
+  /// Petites images (avatars) : toujours chargées, même en économie de données.
+  final bool alwaysLoad;
 
   @override
   State<SignedImage> createState() => _SignedImageState();
@@ -117,7 +120,7 @@ class _SignedImageState extends State<SignedImage> {
       }
     } catch (_) {}
     if (mounted) setState(() => _checked = true);
-    if (AppSettings.I.autoPhotos.value) _download();
+    if (widget.alwaysLoad || AppSettings.I.autoPhotos.value) _download();
   }
 
   Future<void> _download() async {
