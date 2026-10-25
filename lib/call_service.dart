@@ -33,6 +33,14 @@ class CallService {
 
   /// Serveurs TURN personnels (fonction « turn » + compte Metered) si configurés,
   /// sinon les serveurs publics gratuits.
+  String _gather = '-';
+  String _ice = '-';
+
+  void _refreshDiag() {
+    diag.value =
+        'Relais: $turnSource · $_hostCands local, $_srflxCands public, $_relayCands relais · collecte $_gather · ICE $_ice';
+  }
+
   Future<Map<String, dynamic>> _iceConfigAsync() async {
     final fresh = _remoteIceAt != null &&
         DateTime.now().difference(_remoteIceAt!).inMinutes < 10;
@@ -229,6 +237,17 @@ class CallService {
       await pc.addTrack(t, _local!);
     }
     _relayCands = _srflxCands = _hostCands = 0;
+    _gather = '-';
+    _ice = '-';
+    _refreshDiag();
+    pc.onIceGatheringState = (s) {
+      _gather = s.name.replaceFirst('RTCIceGatheringState', '');
+      _refreshDiag();
+    };
+    pc.onIceConnectionState = (s) {
+      _ice = s.name.replaceFirst('RTCIceConnectionState', '');
+      _refreshDiag();
+    };
     pc.onIceCandidate = (c) {
       final to = peerId;
       if (to == null || c.candidate == null) return;
@@ -240,8 +259,7 @@ class CallService {
       } else {
         _hostCands++;
       }
-      diag.value =
-          'Réseau : $_hostCands local, $_srflxCands public, $_relayCands relais ($turnSource)';
+      _refreshDiag();
       _send(to, {
         'type': 'candidate',
         'callId': _callId,

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../updater.dart' show currentBuild;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import '../call_service.dart';
@@ -146,12 +147,12 @@ class _CallScreenState extends State<CallScreen> {
                           ),
                         ),
                       ),
-                      if (c.state.value == CallState.connecting &&
+                      if (c.state.value != CallState.connected &&
                           c.diag.value.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Center(
-                            child: Text(c.diag.value,
+                            child: Text('v$currentBuild · ${c.diag.value}',
                                 style: const TextStyle(
                                     color: Colors.white54, fontSize: 12)),
                           ),
