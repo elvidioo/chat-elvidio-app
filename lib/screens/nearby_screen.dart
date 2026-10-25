@@ -475,7 +475,7 @@ class _NearbyScreenState extends State<NearbyScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mode proche'),
+        title: const Text('À proximité'),
         actions: [
           if (messages.isNotEmpty)
             IconButton(
@@ -523,10 +523,45 @@ class _NearbyScreenState extends State<NearbyScreen> {
                 ),
                 const SizedBox(height: 16),
                 GradientButton(label: 'Démarrer', onPressed: start),
+                const SizedBox(height: 24),
+                _infoCard(),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _infoCard() {
+    Widget line(IconData icon, String text) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 18, color: AppColors.primary),
+              const SizedBox(width: 10),
+              Expanded(child: Text(text, style: const TextStyle(fontSize: 13.5))),
+            ],
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: AppColors.surface2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Pour échanger', style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          line(Icons.bluetooth, 'Bluetooth et localisation activés sur les deux téléphones.'),
+          line(Icons.phone_android, 'L\'autre personne ouvre aussi « À proximité ».'),
+          line(Icons.social_distance, 'Portée limitée (quelques dizaines de mètres). Un message peut passer de téléphone en téléphone, sans garantie.'),
+          line(Icons.lock_open, 'Les messages de ce mode ne sont pas chiffrés et ne sont pas envoyés au serveur : ils restent sur les téléphones.'),
+        ],
       ),
     );
   }
@@ -546,7 +581,9 @@ class _NearbyScreenState extends State<NearbyScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    statusText,
+                    outbox.isEmpty
+                        ? statusText
+                        : '$statusText · ${outbox.length} message(s) en attente',
                     style: TextStyle(color: AppColors.muted),
                   ),
                 ),

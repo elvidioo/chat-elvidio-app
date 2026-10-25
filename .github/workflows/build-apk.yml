@@ -135,7 +135,13 @@ jobs:
 
       - name: Analyse Flutter
         continue-on-error: true
-        run: flutter analyze --no-fatal-infos 2>&1 | tail -80
+        run: |
+          flutter analyze > analyze.txt 2>&1 || true
+          E=$(grep -c "^ *error •" analyze.txt || true)
+          W=$(grep -c "^ *warning •" analyze.txt || true)
+          I=$(grep -c "^ *info •" analyze.txt || true)
+          echo "::notice::flutter analyze : $E erreurs, $W avertissements, $I infos"
+          grep -E "^ *(error|warning) •" analyze.txt | head -8 | while read -r l; do echo "::warning::$l"; done
 
       - name: Tests unitaires
         run: |

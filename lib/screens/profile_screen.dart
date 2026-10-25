@@ -11,6 +11,8 @@ import '../call_service.dart';
 import '../push.dart';
 import '../repo.dart';
 import '../theme.dart';
+import '../settings.dart';
+import 'data_saver_screen.dart';
 import 'settings_screen.dart';
 import '../updater.dart';
 import '../widgets.dart';
@@ -151,6 +153,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _confirmLogout() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Se déconnecter ?'),
+        content: const Text(
+            'Les messages en attente d\'envoi sur ce téléphone seront perdus.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Annuler')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Se déconnecter')),
+        ],
+      ),
+    );
+    if (ok == true) await _logout();
+  }
+
   Future<void> _logout() async {
     CallService.I.stop();
     await Push.logout();
@@ -249,28 +271,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   if (widget.showLogout) ...[
                     const SizedBox(height: 20),
-                    OutlinedButton.icon(
-                      onPressed: () => Share.share(
+                    const Divider(),
+                    ValueListenableBuilder<String>(
+                      valueListenable: AppSettings.I.themeMode,
+                      builder: (context, mode, _) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(
+                                value: 'system',
+                                icon: Icon(Icons.brightness_auto),
+                                label: Text('Auto')),
+                            ButtonSegment(
+                                value: 'light',
+                                icon: Icon(Icons.light_mode),
+                                label: Text('Clair')),
+                            ButtonSegment(
+                                value: 'dark',
+                                icon: Icon(Icons.dark_mode),
+                                label: Text('Sombre')),
+                          ],
+                          selected: {mode},
+                          onSelectionChanged: (v) =>
+                              AppSettings.I.setTheme(v.first),
+                        ),
+                      ),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.eco_rounded, color: AppColors.primary),
+                      title: const Text('Économie de données'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const DataSaverScreen()),
+                      ),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.settings, color: AppColors.primary),
+                      title: const Text('Paramètres, confidentialité et sécurité'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                      ),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.person_add_alt_1, color: AppColors.primary),
+                      title: const Text('Inviter des amis'),
+                      onTap: () => Share.share(
                         'Rejoins-moi sur Chat Elvidio ! Télécharge l\'app ici : '
                         'https://github.com/elvidioo/chat-elvidio-app/releases/latest/download/chat-elvidio.apk',
                       ),
-                      icon: const Icon(Icons.person_add_alt_1),
-                      label: const Text('Inviter des amis'),
                     ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const SettingsScreen(),
-                        ),
-                      ),
-                      icon: const Icon(Icons.settings),
-                      label: const Text('Paramètres'),
-                    ),
-                    const SizedBox(height: 8),
                     TextButton.icon(
-                      onPressed: _logout,
+                      onPressed: _confirmLogout,
                       icon: const Icon(Icons.logout, color: Colors.redAccent),
                       label: const Text(
                         'Se déconnecter',
