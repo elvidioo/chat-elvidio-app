@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'group_invite_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../repo.dart';
@@ -140,6 +142,20 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                     ),
                     title: const Text('Ajouter un membre'),
                     onTap: _add,
+                  ),
+                if (_iAmAdmin)
+                  ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.gold,
+                      child: const Icon(Icons.qr_code_2, color: AppColors.deepGreen),
+                    ),
+                    title: const Text('Inviter par code ou QR'),
+                    subtitle: const Text('Pour ceux qui ne sont pas encore tes amis'),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => GroupInviteScreen(group: widget.group)),
+                    ),
                   ),
                 for (final m in _members)
                   ListTile(

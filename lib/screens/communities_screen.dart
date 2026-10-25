@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../repo.dart';
 import '../theme.dart';
 import 'create_group_screen.dart';
+import 'join_group_screen.dart';
 import 'group_chat_screen.dart';
 
 /// Communautés = les groupes dont l'utilisateur est membre (seules données
@@ -62,6 +63,17 @@ class _CommunitiesScreenState extends State<CommunitiesScreen> {
       appBar: AppBar(
         title: const Text('Communautés'),
         actions: [
+          IconButton(
+            tooltip: 'Rejoindre avec un code',
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const JoinGroupScreen()),
+              );
+              _loadCounts();
+            },
+          ),
           IconButton(
             tooltip: 'Créer un groupe',
             icon: const Icon(Icons.add_circle_outline),
