@@ -1,3 +1,4 @@
+import 'call_service.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -395,6 +396,12 @@ class Repo {
     final uid = _uid;
     if (uid == null) return;
     for (final m in list) {
+      if (m['receiver'] == uid && m['sender'] != uid) {
+        final tag = m['media_name']?.toString();
+        if (tag != null && tag.startsWith('call:')) {
+          CallService.I.onInviteMessage(m);
+        }
+      }
       if (_known.add(m['id'])) {
         if (!_silent && m['receiver'] == uid && m['sender'] != uid) {
           _notify(m);

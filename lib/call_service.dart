@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,22 +22,34 @@ class CallService {
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
 
-  static const _ice = {
-    'iceServers': [
-      {'urls': 'stun:stun.l.google.com:19302'},
-      {'urls': 'stun:stun1.l.google.com:19302'},
-      {
-        'urls': [
-          'turn:openrelay.metered.ca:80',
-          'turn:openrelay.metered.ca:443',
-          'turn:openrelay.metered.ca:443?transport=tcp',
-        ],
-        'username': 'openrelayproject',
-        'credential': 'openrelayproject',
-      },
-    ],
-    'sdpSemantics': 'unified-plan',
-  };
+  // TURN gratuit « Open Relay » (Metered) en mode secret partagé public :
+  // identifiants temporaires calculés ici (HMAC-SHA1, norme TURN REST).
+  // Service tiers gratuit, sans garantie de disponibilité.
+  static const _turnSecret = 'openrelayprojectsecret';
+
+  static Map<String, dynamic> _iceConfig() {
+    final username =
+        '${DateTime.now().toUtc().add(const Duration(hours: 12)).millisecondsSinceEpoch ~/ 1000}';
+    final credential = base64.encode(
+        Hmac(sha1, utf8.encode(_turnSecret)).convert(utf8.encode(username)).bytes);
+    return {
+      'iceServers': [
+        {'urls': 'stun:stun.l.google.com:19302'},
+        {'urls': 'stun:stun1.l.google.com:19302'},
+        {
+          'urls': [
+            'turn:staticauth.openrelay.metered.ca:80',
+            'turn:staticauth.openrelay.metered.ca:443',
+            'turn:staticauth.openrelay.metered.ca:443?transport=tcp',
+            'turns:staticauth.openrelay.metered.ca:443?transport=tcp',
+          ],
+          'username': username,
+          'credential': credential,
+        },
+      ],
+      'sdpSemantics': 'unified-plan',
+    };
+  }
 
   SupabaseClient get _db => Supabase.instance.client;
 
@@ -79,7 +94,23 @@ class CallService {
     ch.onBroadcast(event: 'signal', callback: (p) {
       final data = p['payload'] is Map ? p['payload'] as Map : p;
       _onSignal(Map<String, dynamic>.from(data));
-    }).subscribe();
+    }).subscribe((status, [error]) {
+      // Si la connexion temps réel tombe, on se réabonne (sinon plus d'appel reçu).
+      if (status == RealtimeSubscribeStatus.channelError ||
+          status == RealtimeSubscribeStatus.timedOut ||
+          status == RealtimeSubscribeStatus.closed) {
+        Future.delayed(const Duration(seconds: 4), () {
+          if (_mine == ch && _mineUid == _db.auth.currentUser?.id) {
+            _mine = null;
+            _mineUid = null;
+            try {
+              _db.removeChannel(ch);
+            } catch (_) {}
+            start();
+          }
+        });
+      }
+    });
     _mine = ch;
   }
 
@@ -153,7 +184,7 @@ class CallService {
       'video': withVideo ? {'facingMode': 'user'} : false,
     });
     localRenderer.srcObject = _local;
-    final pc = await createPeerConnection(_ice);
+    final pc = await createPeerConnection(_iceConfig());
     _pc = pc;
     for (final t in _local!.getTracks()) {
       await pc.addTrack(t, _local!);
@@ -223,12 +254,26 @@ class CallService {
       _endCall(notify: false, reason: 'Micro ou caméra indisponible.');
       return;
     }
-    await _send(peer, {
+    final invite = {
       'type': 'invite',
       'callId': _callId,
       'video': withVideo,
       'name': Repo.I.names[_uid] ?? '',
-    });
+    };
+    // 1) signal direct (rapide si l'autre a l'app ouverte)
+    _send(peer, invite);
+    // 2) ligne de message : arrive même si le signal direct est perdu, et
+    //    déclenche la notification push quand l'app de l'autre est fermée.
+    try {
+      await _db.from('messages').insert({
+        'sender': _uid,
+        'receiver': peer,
+        'content': withVideo
+            ? '\u{1F4F9} Appel vidéo'
+            : '\u{1F4DE} Appel vocal',
+        'media_name': 'call:$_callId:${withVideo ? 'v' : 'a'}',
+      });
+    } catch (_) {}
     _ringTimer = Timer(const Duration(seconds: 45), () {
       if (state.value == CallState.calling) {
         _missed();
@@ -238,16 +283,7 @@ class CallService {
 
   Future<void> _missed() async {
     final peer = peerId;
-    if (peer != null) {
-      _send(peer, {'type': 'end', 'callId': _callId});
-      try {
-        await _db.from('messages').insert({
-          'sender': _uid,
-          'receiver': peer,
-          'content': video ? '\u{1F4F9} Appel vidéo manqué' : '\u{1F4DE} Appel vocal manqué',
-        });
-      } catch (_) {}
-    }
+    if (peer != null) _send(peer, {'type': 'end', 'callId': _callId});
     _endCall(notify: false, reason: 'Pas de réponse.');
   }
 
@@ -264,6 +300,7 @@ class CallService {
     }
     state.value = CallState.connecting;
     info.value = 'Connexion…';
+    _armConnectTimeout();
     try {
       await _prepare(video);
     } catch (_) {
@@ -322,15 +359,44 @@ class CallService {
       final isFriend =
           Repo.I.profiles.any((p) => p['id'].toString() == from);
       if (!isFriend) return;
-      if (state.value != CallState.idle) {
-        _send(from, {'type': 'reject', 'callId': d['callId']});
-        return;
+      _ring(from, d['callId']?.toString(), d['video'] == true,
+          d['name']?.toString());
+      return;
+    }
+
+    _afterInvite(type, from, d);
+  }
+
+  final Set<String> _handled = {};
+
+  /// Invitation arrivée par une ligne de message (media_name = call:<id>:<v|a>).
+  void onInviteMessage(Map<String, dynamic> m) {
+    final tag = m['media_name']?.toString() ?? '';
+    if (!tag.startsWith('call:')) return;
+    final parts = tag.split(':');
+    if (parts.length < 3) return;
+    final created = DateTime.tryParse(m['created_at']?.toString() ?? '');
+    if (created == null ||
+        DateTime.now().difference(created.toLocal()).inSeconds > 40) {
+      return;
+    }
+    _ring(m['sender'].toString(), parts[1], parts[2] == 'v', null);
+  }
+
+  void _ring(String from, String? callId, bool isVideo, String? name) {
+    if (callId == null || !_handled.add(callId)) return; // déjà traité
+    if (state.value != CallState.idle) {
+      if (callId != _callId) {
+        _send(from, {'type': 'reject', 'callId': callId});
       }
+      return;
+    }
+    {
       peerId = from;
-      peerName = Repo.I.names[from] ?? (d['name']?.toString() ?? 'Ami');
-      video = d['video'] == true;
+      peerName = Repo.I.names[from] ?? (name ?? 'Ami');
+      video = isVideo;
       incoming = true;
-      _callId = d['callId']?.toString();
+      _callId = callId;
       muted = false;
       camOff = false;
       connectedAt = null;
@@ -343,15 +409,18 @@ class CallService {
           _endCall(notify: false, reason: '');
         }
       });
-      return;
     }
+  }
 
+  Future<void> _afterInvite(
+      String type, String from, Map<String, dynamic> d) async {
     if (from != peerId || d['callId']?.toString() != _callId) return;
 
     switch (type) {
       case 'accept':
         final pc = _pc;
         if (pc == null) return;
+        _armConnectTimeout();
         state.value = CallState.connecting;
         info.value = 'Connexion…';
         final offer = await pc.createOffer();
@@ -417,6 +486,19 @@ class CallService {
       } catch (_) {}
     }
     _pending.clear();
+  }
+
+  void _armConnectTimeout() {
+    _ringTimer?.cancel();
+    _ringTimer = Timer(const Duration(seconds: 30), () {
+      if (state.value == CallState.connecting) {
+        final peer = peerId;
+        if (peer != null) _send(peer, {'type': 'end', 'callId': _callId});
+        _endCall(
+            notify: false,
+            reason: 'Connexion impossible : le réseau bloque l\'appel.');
+      }
+    });
   }
 
   void _startVibrate() {
