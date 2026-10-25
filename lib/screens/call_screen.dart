@@ -80,7 +80,7 @@ class _CallScreenState extends State<CallScreen> {
         backgroundColor: const Color(0xFF111418),
         body: SafeArea(
           child: ListenableBuilder(
-            listenable: Listenable.merge([c.state, c.tick, c.info]),
+            listenable: Listenable.merge([c.state, c.tick, c.info, c.diag]),
             builder: (context, _) {
               final connected = c.state.value == CallState.connected;
               final showVideo = c.video && connected;
@@ -146,6 +146,16 @@ class _CallScreenState extends State<CallScreen> {
                           ),
                         ),
                       ),
+                      if (c.state.value == CallState.connecting &&
+                          c.diag.value.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Center(
+                            child: Text(c.diag.value,
+                                style: const TextStyle(
+                                    color: Colors.white54, fontSize: 12)),
+                          ),
+                        ),
                       const Spacer(),
                       Padding(
                         padding: const EdgeInsets.only(bottom: 36),

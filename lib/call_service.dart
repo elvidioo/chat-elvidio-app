@@ -27,6 +27,43 @@ class CallService {
   // Service tiers gratuit, sans garantie de disponibilité.
   static const _turnSecret = 'openrelayprojectsecret';
 
+  List<dynamic>? _remoteIce;
+  DateTime? _remoteIceAt;
+  String turnSource = 'public';
+
+  /// Serveurs TURN personnels (fonction « turn » + compte Metered) si configurés,
+  /// sinon les serveurs publics gratuits.
+  Future<Map<String, dynamic>> _iceConfigAsync() async {
+    final fresh = _remoteIceAt != null &&
+        DateTime.now().difference(_remoteIceAt!).inMinutes < 10;
+    if (!fresh) {
+      try {
+        final r = await _db.functions
+            .invoke('turn')
+            .timeout(const Duration(seconds: 4));
+        final d = r.data;
+        final list = d is Map ? d['iceServers'] : null;
+        if (list is List && list.isNotEmpty) {
+          _remoteIce = list;
+          _remoteIceAt = DateTime.now();
+        }
+      } catch (_) {}
+    }
+    final remote = _remoteIce;
+    if (remote != null && remote.isNotEmpty) {
+      turnSource = 'metered';
+      return {
+        'iceServers': [
+          {'urls': 'stun:stun.l.google.com:19302'},
+          ...remote,
+        ],
+        'sdpSemantics': 'unified-plan',
+      };
+    }
+    turnSource = 'public';
+    return _iceConfig();
+  }
+
   static Map<String, dynamic> _iceConfig() {
     final username =
         '${DateTime.now().toUtc().add(const Duration(hours: 12)).millisecondsSinceEpoch ~/ 1000}';
@@ -80,6 +117,8 @@ class CallService {
   Timer? _ringTimer;
   Timer? _vibrate;
   bool _screenOpen = false;
+  int _relayCands = 0, _srflxCands = 0, _hostCands = 0;
+  final ValueNotifier<String> diag = ValueNotifier('');
 
   String get _uid => _db.auth.currentUser!.id;
 
@@ -184,14 +223,25 @@ class CallService {
       'video': withVideo ? {'facingMode': 'user'} : false,
     });
     localRenderer.srcObject = _local;
-    final pc = await createPeerConnection(_iceConfig());
+    final pc = await createPeerConnection(await _iceConfigAsync());
     _pc = pc;
     for (final t in _local!.getTracks()) {
       await pc.addTrack(t, _local!);
     }
+    _relayCands = _srflxCands = _hostCands = 0;
     pc.onIceCandidate = (c) {
       final to = peerId;
       if (to == null || c.candidate == null) return;
+      final cs = c.candidate!;
+      if (cs.contains(' typ relay')) {
+        _relayCands++;
+      } else if (cs.contains(' typ srflx')) {
+        _srflxCands++;
+      } else {
+        _hostCands++;
+      }
+      diag.value =
+          'Réseau : $_hostCands local, $_srflxCands public, $_relayCands relais ($turnSource)';
       _send(to, {
         'type': 'candidate',
         'callId': _callId,
@@ -215,7 +265,9 @@ class CallService {
         speaker = withVideo;
         Helper.setSpeakerphoneOn(speaker);
       } else if (s == RTCPeerConnectionState.RTCPeerConnectionStateFailed) {
-        _endCall(notify: true, reason: 'Connexion impossible (réseau).');
+        _endCall(
+            notify: true,
+            reason: 'Connexion impossible (réseau). ${diag.value}');
       }
     };
   }
@@ -494,9 +546,12 @@ class CallService {
       if (state.value == CallState.connecting) {
         final peer = peerId;
         if (peer != null) _send(peer, {'type': 'end', 'callId': _callId});
+        final why = _relayCands == 0
+            ? 'aucun serveur relais joignable'
+            : 'relais disponible mais aucun chemin trouvé';
         _endCall(
             notify: false,
-            reason: 'Connexion impossible : le réseau bloque l\'appel.');
+            reason: 'Connexion impossible ($why). ${diag.value}');
       }
     });
   }
