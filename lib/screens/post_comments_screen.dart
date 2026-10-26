@@ -32,6 +32,8 @@ class _PostCommentsScreenState extends State<PostCommentsScreen> {
   StreamSubscription<List<Map<String, dynamic>>>? _sub;
   bool _loading = true;
   bool _sending = false;
+  Map<String, dynamic>? _replyTo; // commentaire principal auquel on répond
+  final _focus = FocusNode();
 
   @override
   void initState() {
@@ -55,6 +57,7 @@ class _PostCommentsScreenState extends State<PostCommentsScreen> {
   void dispose() {
     _sub?.cancel();
     _text.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -62,7 +65,7 @@ class _PostCommentsScreenState extends State<PostCommentsScreen> {
     try {
       final r = await _db
           .from('post_comments')
-          .select('id, post_id, author, content, created_at')
+          .select('id, post_id, author, content, created_at, parent_id')
           .eq('post_id', widget.postId)
           .order('created_at', ascending: true)
           .timeout(const Duration(seconds: 8));
@@ -94,10 +97,15 @@ class _PostCommentsScreenState extends State<PostCommentsScreen> {
     try {
       final r = await _db
           .from('post_comments')
-          .insert({'post_id': widget.postId, 'content': t})
-          .select('id, post_id, author, content, created_at')
+          .insert({
+            'post_id': widget.postId,
+            'content': t,
+            if (_replyTo != null) 'parent_id': _replyTo!['id'],
+          })
+          .select('id, post_id, author, content, created_at, parent_id')
           .single();
       _text.clear();
+      _replyTo = null;
       if (!_comments.any((c) => c['id'] == r['id'])) {
         _comments = [..._comments, Map<String, dynamic>.from(r)];
       }
@@ -140,12 +148,86 @@ class _PostCommentsScreenState extends State<PostCommentsScreen> {
     if (v == 'delete') {
       try {
         await _db.from('post_comments').delete().eq('id', c['id']);
-        _comments = _comments.where((e) => e['id'] != c['id']).toList();
+        _comments = _comments
+            .where((e) => e['id'] != c['id'] && e['parent_id'] != c['id'])
+            .toList();
         if (mounted) setState(() {});
       } catch (_) {}
     } else if (v == 'report' && mounted) {
       showReportDialog(context, kind: 'post', targetUser: author, targetId: widget.postId);
     }
+  }
+
+  String _nameOf(String id) =>
+      id == me ? 'moi' : (_people[id]?['pseudo']?.toString() ?? 'Utilisateur');
+
+  Widget _tile(Map<String, dynamic> c, bool reply, {Map<String, dynamic>? parent}) {
+    final id = c['author'].toString();
+    final name = id == me ? 'Moi' : (_people[id]?['pseudo']?.toString() ?? 'Utilisateur');
+    final at = DateTime.tryParse(c['created_at']?.toString() ?? '')?.toLocal();
+    return InkWell(
+      onLongPress: () => _options(c),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(reply ? 54 : 12, 6, 12, 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Avatar(
+              name: name, size: reply ? 30 : 38, userId: id,
+              photoUrl: _people[id]?['avatar_url']?.toString(),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        LinkText(c['content']?.toString() ?? '',
+                            style: TextStyle(fontSize: 15, color: AppColors.text),
+                            linkColor: AppColors.primary),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 2, 12, 0),
+                        child: Text(agoText(at),
+                            style: TextStyle(color: AppColors.muted, fontSize: 12)),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() => _replyTo = parent ?? c);
+                          _focus.requestFocus();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text('Répondre',
+                              style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -162,76 +244,54 @@ class _PostCommentsScreenState extends State<PostCommentsScreen> {
                         child: Text('Aucun commentaire.\nSois le premier !',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: AppColors.muted)))
-                    : ListView.builder(
+                    : ListView(
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: _comments.length,
-                        itemBuilder: (_, i) {
-                          final c = _comments[i];
-                          final id = c['author'].toString();
-                          final name = id == me
-                              ? 'Moi'
-                              : (_people[id]?['pseudo']?.toString() ?? 'Utilisateur');
-                          final at = DateTime.tryParse(c['created_at']?.toString() ?? '')?.toLocal();
-                          return InkWell(
-                            onLongPress: () => _options(c),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Avatar(
-                                    name: name, size: 38, userId: id,
-                                    photoUrl: _people[id]?['avatar_url']?.toString(),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Container(
-                                      padding: const EdgeInsets.all(10),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.surface,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(children: [
-                                            Expanded(
-                                              child: Text(name,
-                                                  style: const TextStyle(fontWeight: FontWeight.w700)),
-                                            ),
-                                            Text(agoText(at),
-                                                style: TextStyle(color: AppColors.muted, fontSize: 12)),
-                                          ]),
-                                          const SizedBox(height: 2),
-                                          LinkText(c['content']?.toString() ?? '',
-                                              style: TextStyle(fontSize: 15, color: AppColors.text),
-                                              linkColor: AppColors.primary),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                        children: [
+                          for (final c in _comments.where((e) => e['parent_id'] == null)) ...[
+                            _tile(c, false),
+                            for (final r in _comments.where((e) => e['parent_id'] == c['id']))
+                              _tile(r, true, parent: c),
+                          ],
+                        ],
                       ),
           ),
           SafeArea(
             top: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 6, 8, 8),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_replyTo != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Réponse à ${_nameOf(_replyTo!['author'].toString())}',
+                              style: TextStyle(color: AppColors.muted, fontSize: 13),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => setState(() => _replyTo = null),
+                            child: Icon(Icons.close, size: 18, color: AppColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _text,
+                      focusNode: _focus,
                       maxLength: 1000,
                       minLines: 1,
                       maxLines: 4,
                       textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        hintText: 'Écrire un commentaire…',
+                      decoration: InputDecoration(
+                        hintText: _replyTo == null ? 'Écrire un commentaire…' : 'Écrire une réponse…',
                         counterText: '',
                       ),
                       onSubmitted: (_) => _send(),
@@ -242,6 +302,8 @@ class _PostCommentsScreenState extends State<PostCommentsScreen> {
                     onPressed: _sending ? null : _send,
                     icon: Icon(Icons.send_rounded, color: AppColors.primary),
                   ),
+                ],
+              ),
                 ],
               ),
             ),
