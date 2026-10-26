@@ -6,6 +6,8 @@ import '../media_url.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'compose_post_screen.dart';
+import 'post_comments_screen.dart';
+import 'story_cards.dart';
 import 'video_screen.dart';
 
 /// Fil d'actualité : statuts (24 h) et publications de mes amis.
@@ -22,6 +24,8 @@ class _FeedTabState extends State<FeedTab> {
   List<Map<String, dynamic>> _posts = [];
   final Map<String, Map<String, dynamic>> _people = {};
   final Map<int, Map<String, String>> _reacts = {};
+  final Map<int, int> _commentCounts = {};
+  final _cardsKey = GlobalKey<StoryCardsState>();
   bool _loading = true;
   String? _error;
 
@@ -36,6 +40,7 @@ class _FeedTabState extends State<FeedTab> {
       final r = await _db
           .from('posts')
           .select('id, author, content, media_url, media_name, kind, created_at, expires_at')
+          .eq('kind', 'post')
           .order('created_at', ascending: false)
           .limit(60)
           .timeout(const Duration(seconds: 8));
@@ -52,6 +57,7 @@ class _FeedTabState extends State<FeedTab> {
       }
       _error = null;
       await _loadReactions();
+      await _loadCommentCounts();
     } catch (_) {
       _error = 'Impossible de charger le fil. Vérifie ta connexion.';
     }
@@ -72,6 +78,85 @@ class _FeedTabState extends State<FeedTab> {
             e['emoji'].toString();
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadCommentCounts() async {
+    try {
+      final ids = _posts.where((p) => p['kind'] == 'post').map((p) => p['id']).toList();
+      if (ids.isEmpty) return;
+      final r = await _db.rpc('post_comment_counts', params: {'ids': ids});
+      _commentCounts.clear();
+      for (final e in r as List) {
+        _commentCounts[(e['post_id'] as num).toInt()] = (e['n'] as num).toInt();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _openComments(Map<String, dynamic> p) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PostCommentsScreen(
+            postId: (p['id'] as num).toInt(), postAuthor: p['author'].toString()),
+      ),
+    );
+    await _loadCommentCounts();
+    if (mounted) setState(() {});
+  }
+
+  /// Liste de ceux qui ont réagi, avec leur réaction.
+  void _showReactors(Map<String, dynamic> p) {
+    final id = (p['id'] as num).toInt();
+    final r = _reacts[id] ?? {};
+    if (r.isEmpty) return;
+    final ids = r.keys.toList();
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      builder: (_) => FutureBuilder<List<dynamic>>(
+        future: _db.from('profiles').select('id, pseudo, avatar_url').inFilter('id', ids),
+        builder: (c, snap) {
+          final profs = {
+            for (final e in snap.data ?? const []) e['id'].toString(): e as Map
+          };
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(c).size.height * 0.6),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('${ids.length} réaction${ids.length == 1 ? '' : 's'}',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final uidR in ids)
+                          ListTile(
+                            leading: Avatar(
+                              name: uidR == uid ? 'Moi' : (profs[uidR]?['pseudo']?.toString() ?? '?'),
+                              size: 40, userId: uidR,
+                              photoUrl: profs[uidR]?['avatar_url']?.toString(),
+                            ),
+                            title: Text(uidR == uid
+                                ? 'Moi'
+                                : (profs[uidR]?['pseudo']?.toString() ?? 'Utilisateur')),
+                            trailing: Text(r[uidR] ?? '', style: const TextStyle(fontSize: 26)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _react(Map<String, dynamic> p, String emoji) async {
@@ -129,28 +214,68 @@ class _FeedTabState extends State<FeedTab> {
   }
 
   Widget _reactionBar(Map<String, dynamic> p) {
-    final r = _reacts[(p['id'] as num).toInt()] ?? {};
+    final pid = (p['id'] as num).toInt();
+    final r = _reacts[pid] ?? {};
     final counts = <String, int>{};
     for (final e in r.values) {
       counts[e] = (counts[e] ?? 0) + 1;
     }
-    final summary = counts.entries
-        .map((e) => e.value > 1 ? '${e.key} ${e.value}' : e.key)
-        .join('  ');
+    final emojis = counts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     final mine = r[uid];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(summary, style: const TextStyle(fontSize: 15)),
+    final nComments = _commentCounts[pid] ?? 0;
+    return Column(
+      children: [
+        if (r.isNotEmpty || nComments > 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: Row(
+              children: [
+                if (r.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => _showReactors(p),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(emojis.take(3).map((e) => e.key).join(),
+                            style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: 6),
+                        Text('${r.length}', style: TextStyle(color: AppColors.muted)),
+                      ],
+                    ),
+                  ),
+                const Spacer(),
+                if (nComments > 0)
+                  GestureDetector(
+                    onTap: () => _openComments(p),
+                    child: Text('$nComments commentaire${nComments == 1 ? '' : 's'}',
+                        style: TextStyle(color: AppColors.muted)),
+                  ),
+              ],
+            ),
           ),
-          TextButton(
-            onPressed: () => _pickReaction(p),
-            child: Text(mine == null ? 'Réagir' : '$mine  Modifier'),
-          ),
-        ],
-      ),
+        Divider(height: 1, color: AppColors.surface2),
+        Row(
+          children: [
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () => _pickReaction(p),
+                icon: mine == null
+                    ? Icon(Icons.thumb_up_alt_outlined, color: AppColors.muted)
+                    : Text(mine, style: const TextStyle(fontSize: 18)),
+                label: Text(mine == null ? 'Réagir' : 'Modifier',
+                    style: TextStyle(color: AppColors.muted)),
+              ),
+            ),
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () => _openComments(p),
+                icon: Icon(Icons.chat_bubble_outline, color: AppColors.muted),
+                label: Text('Commenter', style: TextStyle(color: AppColors.muted)),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -163,7 +288,10 @@ class _FeedTabState extends State<FeedTab> {
       context,
       MaterialPageRoute(builder: (_) => ComposePostScreen(status: status)),
     );
-    if (ok == true) _load();
+    if (ok == true) {
+      _load();
+      _cardsKey.currentState?.reload();
+    }
   }
 
   Future<void> _delete(Map<String, dynamic> p) async {
@@ -214,97 +342,6 @@ class _FeedTabState extends State<FeedTab> {
     );
   }
 
-  Widget _statusRow(List<Map<String, dynamic>> statuses) {
-    return SizedBox(
-      height: 104,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        children: [
-          _statusCircle('Mon statut', uid, null, onTap: () => _compose(true), add: true),
-          for (final s in statuses)
-            _statusCircle(_name(s['author'].toString()), s['author'].toString(), s,
-                onTap: () => _showStatus(s)),
-        ],
-      ),
-    );
-  }
-
-  Widget _statusCircle(String label, String id, Map<String, dynamic>? s,
-      {required VoidCallback onTap, bool add = false}) {
-    final name = add ? (_people[uid]?['pseudo']?.toString() ?? 'Moi') : label;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 74,
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: add ? AppColors.muted : AppColors.primary,
-                  width: 2,
-                ),
-              ),
-              child: add
-                  ? CircleAvatar(
-                      radius: 26,
-                      backgroundColor: AppColors.surface2,
-                      child: Icon(Icons.add, color: AppColors.primary),
-                    )
-                  : Avatar(name: name, size: 52, userId: id,
-                      photoUrl: _people[id]?['avatar_url']?.toString()),
-            ),
-            const SizedBox(height: 4),
-            Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showStatus(Map<String, dynamic> s) {
-    final url = s['media_url']?.toString() ?? '';
-    final text = s['content']?.toString() ?? '';
-    showDialog<void>(
-      context: context,
-      builder: (c) => Dialog(
-        backgroundColor: AppColors.surface,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(children: [
-                Avatar(name: _name(s['author'].toString()), size: 36,
-                    userId: s['author'].toString(),
-                    photoUrl: _people[s['author'].toString()]?['avatar_url']?.toString()),
-                const SizedBox(width: 10),
-                Expanded(child: Text(_name(s['author'].toString()),
-                    style: const TextStyle(fontWeight: FontWeight.w700))),
-                IconButton(onPressed: () => Navigator.pop(c), icon: const Icon(Icons.close)),
-              ]),
-              if (url.isNotEmpty) ClipRRect(borderRadius: BorderRadius.circular(12), child: _media(url)),
-              if (text.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: LinkText(text,
-                      style: TextStyle(fontSize: 16, color: AppColors.text),
-                      linkColor: AppColors.primary),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _post(Map<String, dynamic> p) {
     final id = p['author'].toString();
     final url = p['media_url']?.toString() ?? '';
@@ -349,7 +386,6 @@ class _FeedTabState extends State<FeedTab> {
 
   @override
   Widget build(BuildContext context) {
-    final statuses = _posts.where((p) => p['kind'] == 'status').toList();
     final posts = _posts.where((p) => p['kind'] == 'post').toList();
     return SafeArea(
       child: Scaffold(
@@ -360,7 +396,10 @@ class _FeedTabState extends State<FeedTab> {
           child: const Icon(Icons.edit, color: Colors.white),
         ),
         body: RefreshIndicator(
-          onRefresh: _load,
+          onRefresh: () async {
+            _cardsKey.currentState?.reload();
+            await _load();
+          },
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.only(bottom: 90),
@@ -370,7 +409,7 @@ class _FeedTabState extends State<FeedTab> {
                 child: Text('Fil',
                     style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
               ),
-              _statusRow(statuses),
+              StoryCards(key: _cardsKey),
               if (_loading)
                 const Padding(
                   padding: EdgeInsets.all(32),

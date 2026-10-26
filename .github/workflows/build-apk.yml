@@ -31,7 +31,7 @@ jobs:
           from pathlib import Path
           perms = ["INTERNET", "ACCESS_WIFI_STATE", "CHANGE_WIFI_STATE", "BLUETOOTH", "BLUETOOTH_ADMIN",
                    "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION", "BLUETOOTH_ADVERTISE",
-                   "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN", "NEARBY_WIFI_DEVICES", "REQUEST_INSTALL_PACKAGES", "POST_NOTIFICATIONS", "RECORD_AUDIO", "CAMERA", "MODIFY_AUDIO_SETTINGS"]
+                   "BLUETOOTH_CONNECT", "BLUETOOTH_SCAN", "NEARBY_WIFI_DEVICES", "REQUEST_INSTALL_PACKAGES", "POST_NOTIFICATIONS", "RECORD_AUDIO", "CAMERA", "MODIFY_AUDIO_SETTINGS", "USE_FULL_SCREEN_INTENT", "REQUEST_IGNORE_BATTERY_OPTIMIZATIONS", "WAKE_LOCK", "VIBRATE"]
           mf = Path("android/app/src/main/AndroidManifest.xml")
           x = mf.read_text()
           lines = "".join('    <uses-permission android:name="android.permission.%s"/>\n' % p for p in perms)
@@ -43,6 +43,8 @@ jobs:
                   '            <data android:scheme="chatelvidio" android:host="login-callback"/>\n'
                   '        </intent-filter>\n'
                   '        <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>\n')
+          # Les appels entrants peuvent allumer l'écran et s'afficher sur l'écran verrouillé.
+          x = x.replace('android:name=".MainActivity"', 'android:name=".MainActivity" android:showWhenLocked="true" android:turnScreenOn="true"', 1)
           x = x.replace("</activity>", link + "    </activity>", 1)
           mf.write_text(x)
           # Scanner QR : modèle ML Kit téléchargé par Google Play Services (APK plus léger)

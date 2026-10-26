@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -61,6 +62,17 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          section('Arrière-plan et notifications'),
+          ListTile(
+            leading: Icon(Icons.notifications_active_outlined, color: AppColors.primary),
+            title: const Text('Recevoir les messages et appels app fermée'),
+            subtitle: Text(
+              'Teste les notifications et autorise l\'app à rester active en arrière-plan.',
+              style: TextStyle(color: AppColors.muted),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _backgroundHelp(context),
           ),
           section('Messages'),
           ValueListenableBuilder<bool>(
@@ -280,5 +292,109 @@ Future<void> _deleteAccount(BuildContext context) async {
   } catch (_) {
     messenger.showSnackBar(const SnackBar(
         content: Text('Suppression impossible. Vérifie ta connexion et réessaie.')));
+  }
+}
+
+Future<void> _backgroundHelp(BuildContext context) async {
+  await showDialog<void>(
+    context: context,
+    builder: (c) => const _BackgroundDialog(),
+  );
+}
+
+class _BackgroundDialog extends StatefulWidget {
+  const _BackgroundDialog();
+
+  @override
+  State<_BackgroundDialog> createState() => _BackgroundDialogState();
+}
+
+class _BackgroundDialogState extends State<_BackgroundDialog> {
+  String _push = 'Vérification…';
+  bool _notif = false;
+  bool _battery = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final n = await Permission.notification.isGranted;
+    final b = await Permission.ignoreBatteryOptimizations.isGranted;
+    final p = await Push.diagnose();
+    if (mounted) {
+      setState(() {
+        _notif = n;
+        _battery = b;
+        _push = p;
+      });
+    }
+  }
+
+  Widget _row(bool ok, String text) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(ok ? Icons.check_circle : Icons.error_outline,
+                size: 20, color: ok ? Colors.green : Colors.orange),
+            const SizedBox(width: 8),
+            Expanded(child: Text(text)),
+          ],
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Arrière-plan'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _row(_notif, _notif ? 'Notifications autorisées' : 'Notifications non autorisées'),
+            _row(_push.startsWith('OK'), _push),
+            _row(_battery,
+                _battery ? 'App non limitée par la batterie' : 'La batterie peut mettre l\'app en veille'),
+            const SizedBox(height: 10),
+            Text(
+              'Sur certains téléphones (Tecno, Infinix, Xiaomi, Samsung…), il faut aussi autoriser « Démarrage automatique » et « Aucune restriction » pour Chat Elvidio dans les réglages du téléphone.',
+              style: TextStyle(color: AppColors.muted, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () async {
+            await Permission.notification.request();
+            _refresh();
+          },
+          child: const Text('Autoriser notifs'),
+        ),
+        TextButton(
+          onPressed: () async {
+            await Permission.ignoreBatteryOptimizations.request();
+            _refresh();
+          },
+          child: const Text('Batterie : autoriser'),
+        ),
+        TextButton(
+          onPressed: () async {
+            final ok = await Notifier.testNotification();
+            if (!ok && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Notifications indisponibles.')));
+            }
+          },
+          child: const Text('Tester'),
+        ),
+        TextButton(onPressed: openAppSettings, child: const Text('Réglages du téléphone')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer')),
+      ],
+    );
   }
 }

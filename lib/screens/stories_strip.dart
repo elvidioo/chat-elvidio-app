@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../repo.dart';
+import '../stories.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'compose_post_screen.dart';
+import 'story_cards.dart';
 
-/// Rangée de stories : statuts non expirés visibles (amis + moi, selon RLS).
-/// « Vu / non vu » n'est pas suivi par le backend : pas de distinction affichée.
+/// Rangée compacte de stories (écran Discussions). Anneau doré = story non vue.
+/// Toucher ouvre directement la story ; le fil complet est dans l'onglet Stories.
 class StoriesStrip extends StatefulWidget {
   const StoriesStrip({super.key, required this.onOpenStories});
 
@@ -19,7 +21,8 @@ class StoriesStrip extends StatefulWidget {
 
 class _StoriesStripState extends State<StoriesStrip> {
   final db = Supabase.instance.client;
-  List<String> authors = [];
+  List<StoryGroup> groups = [];
+  final Map<String, Map<String, dynamic>> people = {};
 
   @override
   void initState() {
@@ -29,30 +32,28 @@ class _StoriesStripState extends State<StoriesStrip> {
 
   Future<void> _load() async {
     try {
-      final rows = await db
-          .from('posts')
-          .select('author, created_at')
-          .eq('kind', 'status')
-          .gt('expires_at', DateTime.now().toUtc().toIso8601String())
-          .order('created_at', ascending: false)
-          .limit(60)
-          .timeout(const Duration(seconds: 8));
-      final seen = <String>[];
-      for (final r in rows) {
-        final a = r['author'].toString();
-        if (!seen.contains(a)) seen.add(a);
+      final g = await StoryService.load();
+      final ids = g.map((e) => e.author).toList();
+      if (ids.isNotEmpty) {
+        final ps = await db.from('profiles').select('id, pseudo, avatar_url').inFilter('id', ids);
+        for (final p in ps) {
+          people[p['id'].toString()] = Map<String, dynamic>.from(p);
+        }
       }
-      if (mounted) setState(() => authors = seen);
+      if (mounted) setState(() => groups = g);
     } catch (_) {
-      // Hors ligne : on garde la rangée telle quelle (bouton « Ma story » seul).
+      // Hors ligne : on garde la rangée telle quelle.
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final me = db.auth.currentUser!.id;
-    final others = authors.where((a) => a != me).toList();
-    final mine = authors.contains(me);
+    final mineIdx = groups.indexWhere((g) => g.author == me);
+    final others = [
+      for (var i = 0; i < groups.length; i++)
+        if (groups[i].author != me) i
+    ];
     return SizedBox(
       height: 96,
       child: ListView(
@@ -60,9 +61,9 @@ class _StoriesStripState extends State<StoriesStrip> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         children: [
           _item(
-            label: mine ? 'Ma story' : 'Ajouter',
-            ring: mine,
-            child: mine
+            label: mineIdx >= 0 ? 'Ma story' : 'Ajouter',
+            ring: mineIdx >= 0 ? AppColors.surface2 : null,
+            child: mineIdx >= 0
                 ? Avatar(name: 'Moi', size: 52, userId: me)
                 : CircleAvatar(
                     radius: 26,
@@ -70,24 +71,34 @@ class _StoriesStripState extends State<StoriesStrip> {
                     child: Icon(Icons.add, color: AppColors.primary),
                   ),
             onTap: () async {
-              if (mine) {
-                widget.onOpenStories();
+              if (mineIdx >= 0) {
+                await openStories(context, groups, mineIdx, people);
               } else {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (_) => const ComposePostScreen(status: true)),
                 );
-                _load();
               }
+              _load();
             },
           ),
-          for (final a in others)
+          for (final i in others)
             _item(
-              label: Repo.I.names[a] ?? 'Ami',
-              ring: true,
-              child: Avatar(name: Repo.I.names[a] ?? '?', size: 52, userId: a),
-              onTap: widget.onOpenStories,
+              label: people[groups[i].author]?['pseudo']?.toString() ??
+                  Repo.I.names[groups[i].author] ??
+                  'Ami',
+              ring: groups[i].allSeen ? AppColors.surface2 : AppColors.gold,
+              child: Avatar(
+                name: Repo.I.names[groups[i].author] ?? '?',
+                size: 52,
+                userId: groups[i].author,
+                photoUrl: people[groups[i].author]?['avatar_url']?.toString(),
+              ),
+              onTap: () async {
+                await openStories(context, groups, i, people);
+                _load();
+              },
             ),
         ],
       ),
@@ -96,7 +107,7 @@ class _StoriesStripState extends State<StoriesStrip> {
 
   Widget _item({
     required String label,
-    required bool ring,
+    required Color? ring,
     required Widget child,
     required VoidCallback onTap,
   }) {
@@ -114,9 +125,7 @@ class _StoriesStripState extends State<StoriesStrip> {
                 padding: const EdgeInsets.all(2),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(
-                      color: ring ? AppColors.gold : AppColors.surface2,
-                      width: 2.5),
+                  border: Border.all(color: ring ?? AppColors.surface2, width: 2.5),
                 ),
                 child: child,
               ),

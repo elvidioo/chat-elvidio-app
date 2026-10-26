@@ -9,6 +9,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'notifications.dart';
 import 'repo.dart';
 import 'screens/call_screen.dart';
 
@@ -582,6 +583,7 @@ class CallService {
 
   void _startVibrate() {
     _vibrate?.cancel();
+    Notifier.cancel(777001); // l'app prend le relais : plus de notification d'appel
     SystemSound.play(SystemSoundType.alert);
     _vibrate = Timer.periodic(const Duration(milliseconds: 1500), (_) {
       HapticFeedback.vibrate();
@@ -590,6 +592,7 @@ class CallService {
   }
 
   void _stopVibrate() {
+    Notifier.cancel(777001);
     _vibrate?.cancel();
     _vibrate = null;
   }

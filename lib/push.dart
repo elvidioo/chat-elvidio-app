@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'notifications.dart';
 import 'settings.dart';
 
 /// Notifications push (Firebase) : reçues même quand l'app est fermée.
@@ -31,6 +32,7 @@ class Push {
           );
         }
         _ready = true;
+        FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
         FirebaseMessaging.instance.onTokenRefresh.listen((t) {
           _token = t;
           sync();
@@ -39,6 +41,31 @@ class Push {
       }
       await sync();
     } catch (_) {}
+  }
+
+  /// État pour l'écran de diagnostic : le téléphone est-il enregistré pour les notifications ?
+  static Future<String> diagnose() async {
+    if (!Platform.isAndroid) return 'Android seulement.';
+    if (!_ready) await init();
+    if (!_ready) return 'Firebase indisponible sur ce téléphone.';
+    try {
+      final uid = _db.auth.currentUser?.id;
+      final t = _token ?? await FirebaseMessaging.instance.getToken();
+      if (t == null) return 'Pas de jeton Firebase (vérifie Google Play Services et ta connexion).';
+      final rows = await _db
+          .from('device_tokens')
+          .select('token')
+          .eq('token', t)
+          .eq('user_id', uid ?? '');
+      if ((rows as List).isEmpty) {
+        return AppSettings.I.notifications.value
+            ? 'Jeton non enregistré sur ton compte. Ferme et rouvre l\'app.'
+            : 'Notifications désactivées dans les réglages de l\'app.';
+      }
+      return 'OK : ce téléphone est enregistré pour recevoir les notifications.';
+    } catch (e) {
+      return 'Vérification impossible : $e';
+    }
   }
 
   /// Enregistre (ou retire) ce téléphone selon le réglage "Notifications".
