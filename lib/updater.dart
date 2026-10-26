@@ -8,9 +8,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// Téléphones 64 bits : petit APK arm64. Anciens téléphones 32 bits : arm32.
-final String _apkName = Platform.version.contains('arm64') || Platform.version.contains('x64')
-    ? 'chat-elvidio.apk'
-    : 'chat-elvidio-arm32.apk';
+/// Vrai pour l'APK Lite (sans appels) : il se met à jour avec l'APK Lite.
+const isLite = bool.fromEnvironment('LITE');
+final String _apkName = (Platform.version.contains('arm64') || Platform.version.contains('x64'))
+    ? (isLite ? 'chat-elvidio-lite.apk' : 'chat-elvidio.apk')
+    : (isLite ? 'chat-elvidio-lite-arm32.apk' : 'chat-elvidio-arm32.apk');
 
 /// Numéro de version de cette installation (donné par le build GitHub).
 const currentBuild = int.fromEnvironment('BUILD_NUMBER', defaultValue: 0);

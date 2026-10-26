@@ -223,21 +223,39 @@ jobs:
           MSG=$(cut -c1-300 /tmp/err.txt | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::error title=Erreurs de compilation::$MSG"
 
-      - name: Publier l APK sur la page Releases
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Garder les APK complets
         run: |
           ls -la build/app/outputs/flutter-apk/
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk chat-elvidio.apk
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk chat-elvidio-arm32.apk
           zip chat-elvidio-apk.zip chat-elvidio.apk
-          gh release create "build-${{ github.run_number }}" chat-elvidio.apk chat-elvidio-arm32.apk chat-elvidio-apk.zip \
+
+      - name: Compiler la version Lite (sans appels, plus petite)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -o pipefail
+          sed -i '/flutter_webrtc:/d' pubspec.yaml
+          cp ci/lite/call_service.dart lib/call_service.dart
+          rm -f lib/screens/call_screen.dart
+          flutter pub get
+          flutter build apk --release --split-per-abi --no-shrink --obfuscate --split-debug-info=build/debug-info-lite --build-number=${{ github.run_number }} --dart-define=BUILD_NUMBER=${{ github.run_number }} --dart-define=LITE=true --target-platform android-arm,android-arm64 --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build-lite.log
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk chat-elvidio-lite.apk
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk chat-elvidio-lite-arm32.apk
+          ls -la chat-elvidio*.apk
+
+      - name: Publier les APK sur la page Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "build-${{ github.run_number }}" chat-elvidio.apk chat-elvidio-arm32.apk chat-elvidio-apk.zip chat-elvidio-lite.apk chat-elvidio-lite-arm32.apk \
             --title "Chat Elvidio build ${{ github.run_number }}" \
-            --notes "chat-elvidio.apk = telephones 64 bits (la plupart). chat-elvidio-arm32.apk = anciens telephones 32 bits." \
+            --notes "chat-elvidio.apk = complet, telephones 64 bits (la plupart). chat-elvidio-arm32.apk = complet, anciens telephones 32 bits. chat-elvidio-lite.apk / chat-elvidio-lite-arm32.apk = version Lite plus petite, sans appels audio/video." \
             --latest
 
       - name: Publier l APK
         uses: actions/upload-artifact@v4
         with:
           name: chat-elvidio-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          path: chat-elvidio*.apk
