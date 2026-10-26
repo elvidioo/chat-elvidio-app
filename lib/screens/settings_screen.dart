@@ -11,7 +11,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../call_service.dart';
 import '../push.dart';
 import '../repo.dart';
+import 'admin_screen.dart';
 import 'auth_screen.dart';
+import 'premium_screen.dart';
 
 import '../notifications.dart';
 import '../policy_text.dart';
@@ -19,6 +21,7 @@ import 'blocked_screen.dart';
 import 'data_saver_screen.dart';
 import '../settings.dart';
 import '../theme.dart';
+import '../premium.dart';
 import '../presence.dart';
 import '../updater.dart';
 
@@ -62,6 +65,30 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          section('Soutien'),
+          ListTile(
+            leading: const Icon(Icons.star_rounded, color: AppColors.gold),
+            title: const Text('Premium'),
+            subtitle: Text('Badge doré, stories de 72 h, soutiens l\'app.',
+                style: TextStyle(color: AppColors.muted)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const PremiumScreen())),
+          ),
+          ValueListenableBuilder<bool>(
+            valueListenable: Premium.I.isAdmin,
+            builder: (context, admin, _) => admin
+                ? ListTile(
+                    leading: Icon(Icons.admin_panel_settings_outlined, color: AppColors.primary),
+                    title: const Text('Administration'),
+                    subtitle: Text('Demandes Premium, prix, paiement.',
+                        style: TextStyle(color: AppColors.muted)),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                        context, MaterialPageRoute(builder: (_) => const AdminScreen())),
+                  )
+                : const SizedBox.shrink(),
           ),
           section('Arrière-plan et notifications'),
           ListTile(
@@ -281,6 +308,7 @@ Future<void> _deleteAccount(BuildContext context) async {
     CallService.I.stop();
     await Push.logout();
     LivePresence.I.stop();
+    Premium.I.stop();
     await Repo.I.stop();
     try {
       await db.auth.signOut();

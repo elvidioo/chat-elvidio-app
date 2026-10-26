@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../call_service.dart';
 import '../notifications.dart';
+import '../premium.dart';
 import '../presence.dart';
 import '../push.dart';
 import '../repo.dart';
@@ -34,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     Repo.I.start();
     LivePresence.I.start();
+    Premium.I.start();
     Push.init();
     CallService.I.start();
     Repo.I.touchLastSeen();

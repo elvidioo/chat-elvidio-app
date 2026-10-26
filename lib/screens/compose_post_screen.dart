@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../premium.dart';
 import '../settings.dart';
 import '../theme.dart';
 
@@ -90,7 +91,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
         'kind': widget.status ? 'status' : 'post',
         if (widget.status)
           'expires_at':
-              DateTime.now().toUtc().add(const Duration(hours: 24)).toIso8601String(),
+              DateTime.now().toUtc().add(Duration(hours: Premium.I.mePremium ? 72 : 24)).toIso8601String(),
       });
       if (mounted) Navigator.pop(context, true);
     } catch (e) {

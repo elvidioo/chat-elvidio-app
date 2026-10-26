@@ -44,6 +44,7 @@ jobs:
                   '        </intent-filter>\n'
                   '        <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>\n')
           # Les appels entrants peuvent allumer l'écran et s'afficher sur l'écran verrouillé.
+          x = re.sub(r'android:label="[^"]*"', 'android:label="Chat Elvidio"', x, count=1)
           x = x.replace('android:name=".MainActivity"', 'android:name=".MainActivity" android:showWhenLocked="true" android:turnScreenOn="true"', 1)
           x = x.replace("</activity>", link + "    </activity>", 1)
           mf.write_text(x)
@@ -236,6 +237,28 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -o pipefail
+          python3 - <<'PY'
+          import json, re, copy
+          from pathlib import Path
+          # Autre application (autre identifiant) : s'installe a cote de la complete.
+          for name in ("android/app/build.gradle.kts", "android/app/build.gradle"):
+              f = Path(name)
+              if f.exists():
+                  g = f.read_text()
+                  g2 = re.sub(r'(applicationId\s*=?\s*")([^"]+)(")', r'\1\2.lite\3', g, count=1)
+                  assert g2 != g, "applicationId introuvable"
+                  f.write_text(g2)
+          mf = Path("android/app/src/main/AndroidManifest.xml")
+          x = mf.read_text()
+          x = re.sub(r'android:label="[^"]*"', 'android:label="Chat Elvidio Lite"', x, count=1)
+          mf.write_text(x)
+          gs = Path("android/app/google-services.json")
+          d = json.loads(gs.read_text())
+          c = copy.deepcopy(d["client"][0])
+          c["client_info"]["android_client_info"]["package_name"] += ".lite"
+          d["client"].append(c)
+          gs.write_text(json.dumps(d))
+          PY
           sed -i '/flutter_webrtc:/d' pubspec.yaml
           cp ci/lite/call_service.dart lib/call_service.dart
           rm -f lib/screens/call_screen.dart

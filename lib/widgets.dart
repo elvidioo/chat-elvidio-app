@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'media_url.dart';
+import 'premium.dart';
 import 'presence.dart';
 import 'theme.dart';
 
@@ -72,7 +73,7 @@ class Avatar extends StatelessWidget {
     final id = userId;
     if (id == null && photoUrl == null) return _circle(photoUrl);
     return ListenableBuilder(
-      listenable: Listenable.merge([LivePresence.I.avatars, LivePresence.I.online]),
+      listenable: Listenable.merge([LivePresence.I.avatars, LivePresence.I.online, Premium.I.ids]),
       builder: (context, _) {
         final url = photoUrl ?? LivePresence.I.avatars.value[id];
         final isOn = showOnline && id != null && LivePresence.I.online.value.contains(id);
@@ -80,6 +81,23 @@ class Avatar extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             _circle(url),
+            if (id != null && size >= 30 && Premium.I.ids.value.contains(id))
+              Positioned(
+                left: -2,
+                bottom: -2,
+                child: Container(
+                  width: size * 0.34,
+                  height: size * 0.34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.gold,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.bg, width: 1.5),
+                  ),
+                  child: Icon(Icons.star_rounded,
+                      size: size * 0.24, color: const Color(0xFF07130F)),
+                ),
+              ),
             if (isOn)
               Positioned(
                 right: -1,

@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../premium.dart';
 import '../presence.dart';
 import '../call_service.dart';
 import '../push.dart';
@@ -177,6 +178,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     CallService.I.stop();
     await Push.logout();
     LivePresence.I.stop();
+    Premium.I.stop();
     await Repo.I.stop();
     await _db.auth.signOut();
     if (!mounted) return;
