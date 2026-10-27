@@ -12,6 +12,7 @@ import '../call_service.dart';
 import '../push.dart';
 import '../repo.dart';
 import 'admin_screen.dart';
+import 'ai_assistant_screen.dart';
 import 'auth_screen.dart';
 import 'premium_screen.dart';
 
@@ -65,6 +66,16 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+          section('Intelligence artificielle'),
+          ListTile(
+            leading: Icon(Icons.smart_toy_outlined, color: AppColors.primary),
+            title: const Text('Assistant IA'),
+            subtitle: Text('Répond à tes messages quand tu es indisponible.',
+                style: TextStyle(color: AppColors.muted)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const AiAssistantScreen())),
           ),
           section('Soutien'),
           ListTile(
