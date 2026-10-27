@@ -9,6 +9,7 @@ import 'chat_screen.dart';
 import '../settings.dart';
 import 'communities_screen.dart';
 import 'search_screen.dart';
+import 'ai_chat_screen.dart';
 import 'stories_strip.dart';
 import 'friends_screen.dart';
 import 'group_chat_screen.dart';
@@ -489,6 +490,17 @@ class _ChatsTabState extends State<ChatsTab> {
     final children = <Widget>[];
     children.add(StoriesStrip(onOpenStories: widget.onOpenStories));
     children.add(nearbyBanner());
+    if (query.isEmpty) {
+      children.add(ListTile(
+        leading: const AiAvatar(size: 46),
+        title: const Text('Elvidio IA', style: TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text('Discute avec ton assistant intelligent',
+            style: TextStyle(color: AppColors.muted)),
+        trailing: Icon(Icons.auto_awesome, color: AppColors.gold, size: 18),
+        onTap: () => Navigator.push(
+            context, MaterialPageRoute(builder: (_) => const AiChatScreen())),
+      ));
+    }
     if (query.isEmpty && all.isNotEmpty) children.add(contactsRow(all));
     if (entries.isEmpty) {
       children.add(all.isEmpty

@@ -70,8 +70,8 @@ class SettingsScreen extends StatelessWidget {
           section('Intelligence artificielle'),
           ListTile(
             leading: Icon(Icons.smart_toy_outlined, color: AppColors.primary),
-            title: const Text('Assistant IA'),
-            subtitle: Text('Répond à tes messages quand tu es indisponible.',
+            title: const Text('Réponse automatique à ma place'),
+            subtitle: Text('L\'IA répond à tes amis quand tu es indisponible.',
                 style: TextStyle(color: AppColors.muted)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.push(

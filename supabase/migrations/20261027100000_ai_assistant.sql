@@ -47,3 +47,16 @@ create table public.internal_secrets (key text primary key, value text not null)
 alter table public.internal_secrets enable row level security;
 revoke all on public.internal_secrets from anon, authenticated;
 -- insert into public.internal_secrets (key, value) values ('ai_hook', '<valeur aléatoire, identique à celle du déclencheur>');
+
+-- Discussion directe avec l'IA (écrite uniquement par la fonction ai-chat)
+create table public.ai_chats (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  role text not null check (role in ('user','assistant')),
+  content text not null check (char_length(content) <= 4000),
+  created_at timestamptz not null default now()
+);
+create index ai_chats_user_idx on public.ai_chats (user_id, created_at desc);
+alter table public.ai_chats enable row level security;
+create policy "voir ma discussion ia" on public.ai_chats for select to authenticated using (user_id = (select auth.uid()));
+create policy "vider ma discussion ia" on public.ai_chats for delete to authenticated using (user_id = (select auth.uid()));

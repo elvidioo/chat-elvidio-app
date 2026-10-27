@@ -117,7 +117,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Assistant IA')),
+      appBar: AppBar(title: const Text('Réponse automatique')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(

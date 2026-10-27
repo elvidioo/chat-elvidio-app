@@ -16,4 +16,4 @@ Dernière mise à jour : 25 octobre 2026. Contact : ouvrir une « issue » sur h
 
 **Règles d'usage** : pas de harcèlement, de contenu illégal ou de spam. Les comptes abusifs peuvent être suspendus.
 
-**Assistant IA (optionnel)** : si tu l'actives, les messages texte privés reçus pendant que tu es indisponible sont envoyés à un service d'IA (Google Gemini ou Anthropic) pour rédiger une réponse automatique, signalée comme telle à tes contacts. Rien n'est envoyé si tu ne l'actives pas.
+**Assistant IA (optionnel)** : si tu l'actives, les messages texte privés reçus pendant que tu es indisponible sont envoyés à un service d'IA (Google Gemini ou Anthropic) pour rédiger une réponse automatique, signalée comme telle à tes contacts. Rien n'est envoyé si tu ne l'actives pas. La discussion avec « Elvidio IA » passe aussi par ce service d'IA : ne lui confie pas d'informations sensibles.
