@@ -99,6 +99,10 @@ Deno.serve(async (req) => {
     return json(200, { reply });
   } catch (e) {
     console.log('ai-chat error', String(e));
+    // Dernière erreur gardée pour le diagnostic (jamais la clé : seulement le message du service).
+    try {
+      await db.from('app_config').upsert({ key: 'ai_last_error', value: `${new Date().toISOString()} ${String(e).slice(0, 400)}` });
+    } catch (_) { /* ignore */ }
     return json(500, { error: 'L\'assistant n\'est pas disponible pour le moment.' });
   }
 });
