@@ -16,19 +16,29 @@ async function generate(system: string, convo: Turn[]): Promise<string> {
   const ant = Deno.env.get('ANTHROPIC_API_KEY');
   const custom = Deno.env.get('AI_MODEL');
   if (gem) {
-    const models = custom ? [custom] : ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+    const models = custom ? [custom] : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
     let last = '';
     for (const m of models) {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+      let res: Response;
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
         method: 'POST',
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(12000),
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': gem },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: convo.map((c) => ({ role: c.role === 'user' ? 'user' : 'model', parts: [{ text: c.text }] })),
-          generationConfig: { maxOutputTokens: 800, temperature: 0.8 },
+          generationConfig: {
+            maxOutputTokens: 800,
+            temperature: 0.8,
+            ...(m.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+          },
         }),
       });
+      } catch (e) {
+        last = `gemini ${m} ${String(e)}`;
+        continue; // délai dépassé : on essaie le modèle suivant
+      }
       if (res.ok) {
         const j = await res.json();
         const t = (j.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? '').join('').trim();
