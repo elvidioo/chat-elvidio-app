@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../theme.dart';
-import '../widgets.dart';
 
 /// Discussion directe avec « Elvidio IA ».
 class AiChatScreen extends StatefulWidget {
