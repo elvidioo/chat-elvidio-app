@@ -16,7 +16,7 @@ async function generate(system: string, convo: Turn[]): Promise<string> {
   const ant = Deno.env.get('ANTHROPIC_API_KEY');
   const custom = Deno.env.get('AI_MODEL');
   if (gem) {
-    const models = custom ? [custom] : ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
+    const models = custom ? [custom] : ['gemini-flash-lite-latest', 'gemini-3.8-flash', 'gemini-flash-latest'];
     let last = '';
     const all: string[] = [];
     for (const m of models) {
@@ -30,7 +30,7 @@ async function generate(system: string, convo: Turn[]): Promise<string> {
           systemInstruction: { parts: [{ text: system }] },
           contents: convo.map((c) => ({ role: c.role === 'user' ? 'user' : 'model', parts: [{ text: c.text }] })),
           generationConfig: {
-            maxOutputTokens: 800,
+            maxOutputTokens: 600,
             temperature: 0.8,
             ...(m.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
           },
@@ -84,13 +84,14 @@ Deno.serve(async (req) => {
     if (!msg) return json(400, { error: 'message vide' });
 
     const hourAgo = new Date(Date.now() - 3600_000).toISOString();
-    const { count } = await db.from('ai_chats').select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id).eq('role', 'user').gt('created_at', hourAgo);
+    const [{ count }, { data: me }, { data: hist }] = await Promise.all([
+      db.from('ai_chats').select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id).eq('role', 'user').gt('created_at', hourAgo),
+      db.from('profiles').select('pseudo').eq('id', user.id).maybeSingle(),
+      db.from('ai_chats').select('role, content')
+        .eq('user_id', user.id).order('created_at', { ascending: false }).limit(12),
+    ]);
     if ((count ?? 0) >= 40) return json(429, { error: 'Tu as beaucoup discuté : réessaie dans un moment.' });
-
-    const { data: me } = await db.from('profiles').select('pseudo').eq('id', user.id).maybeSingle();
-    const { data: hist } = await db.from('ai_chats').select('role, content')
-      .eq('user_id', user.id).order('created_at', { ascending: false }).limit(20);
     const convo: Turn[] = [];
     for (const h of (hist ?? []).reverse()) convo.push({ role: h.role, text: h.content });
     convo.push({ role: 'user', text: msg });
@@ -104,10 +105,13 @@ Deno.serve(async (req) => {
       `Refuse poliment ce qui est dangereux ou illégal. Ne prétends pas être humain.`;
 
     const reply = (await generate(system, convo)).slice(0, 3500);
-    await db.from('ai_chats').insert([
+    const saved = Promise.resolve(db.from('ai_chats').insert([
       { user_id: user.id, role: 'user', content: msg },
       { user_id: user.id, role: 'assistant', content: reply },
-    ]);
+    ]));
+    // Répond tout de suite ; l'enregistrement de l'historique finit en arrière-plan.
+    // @ts-ignore EdgeRuntime est fourni par Supabase
+    if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(saved); else await saved;
     return json(200, { reply });
   } catch (e) {
     console.log('ai-chat error', String(e));
