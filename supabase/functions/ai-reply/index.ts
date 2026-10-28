@@ -18,20 +18,36 @@ async function generate(system: string, convo: { role: 'user' | 'assistant'; tex
   const model = Deno.env.get('AI_MODEL');
   const ctl = AbortSignal.timeout(20000);
   if (gem) {
-    const m = model || 'gemini-2.5-flash';
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
-      method: 'POST',
-      signal: ctl,
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': gem },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: convo.map((c) => ({ role: c.role === 'user' ? 'user' : 'model', parts: [{ text: c.text }] })),
-        generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
-      }),
-    });
-    if (!res.ok) throw new Error('gemini ' + res.status + ' ' + (await res.text()).slice(0, 300));
-    const j = await res.json();
-    return (j.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? '').join('').trim();
+    const models = custom ? [custom] : ['gemini-flash-lite-latest', 'gemini-3.8-flash', 'gemini-flash-latest'];
+    const errs: string[] = [];
+    for (const m of models) {
+      let res: Response;
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+          method: 'POST',
+          signal: AbortSignal.timeout(12000),
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': gem },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: convo.map((c) => ({ role: c.role === 'user' ? 'user' : 'model', parts: [{ text: c.text }] })),
+            generationConfig: { maxOutputTokens: 300, temperature: 0.7 },
+          }),
+        });
+      } catch (e) {
+        errs.push(`gemini ${m} ${String(e)}`);
+        continue;
+      }
+      if (res.ok) {
+        const j = await res.json();
+        const t = (j.candidates?.[0]?.content?.parts ?? []).map((p: any) => p.text ?? '').join('').trim();
+        if (t) return t;
+        errs.push(`gemini ${m} réponse vide`);
+        continue;
+      }
+      errs.push(`gemini ${m} ${res.status} ${(await res.text()).slice(0, 120)}`);
+      if (res.status !== 404 && res.status !== 400) break;
+    }
+    throw new Error(errs.join(' | '));
   }
   if (ant) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -110,6 +126,9 @@ Deno.serve(async (req) => {
     return new Response('ok');
   } catch (e) {
     console.log('ai-reply error', String(e));
+    try {
+      await db.from('app_config').upsert({ key: 'ai_last_error', value: `${new Date().toISOString()} reply: ${String(e).slice(0, 400)}` });
+    } catch (_) { /* ignore */ }
     return new Response('error', { status: 500 });
   }
 });
