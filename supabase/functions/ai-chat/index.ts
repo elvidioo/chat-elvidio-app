@@ -16,8 +16,9 @@ async function generate(system: string, convo: Turn[]): Promise<string> {
   const ant = Deno.env.get('ANTHROPIC_API_KEY');
   const custom = Deno.env.get('AI_MODEL');
   if (gem) {
-    const models = custom ? [custom] : ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+    const models = custom ? [custom] : ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest'];
     let last = '';
+    const all: string[] = [];
     for (const m of models) {
       let res: Response;
       try {
@@ -46,10 +47,11 @@ async function generate(system: string, convo: Turn[]): Promise<string> {
         last = 'réponse vide';
         continue;
       }
-      last = `gemini ${m} ${res.status} ${(await res.text()).slice(0, 200)}`;
+      last = `gemini ${m} ${res.status} ${(await res.text()).slice(0, 120)}`;
+      all.push(last);
       if (res.status !== 404 && res.status !== 400) break; // quota, clé... : inutile d'essayer un autre modèle
     }
-    throw new Error(last);
+    throw new Error(all.join(' | ') || last);
   }
   if (ant) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
