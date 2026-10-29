@@ -4,7 +4,7 @@
 # Variables : MODE (release|patch), RUN (numero de build), SHOREBIRD_TOKEN, BUILD_REF (numero de l'APK a corriger).
 set -o pipefail
 DIR="$1"; shift
-EXTRA=(--no-shrink --obfuscate "--split-debug-info=$DIR")
+EXTRA=(--no-shrink --no-tree-shake-icons --obfuscate "--split-debug-info=$DIR")
 if [ -n "$SHOREBIRD_TOKEN" ]; then
   if [ "$MODE" = "patch" ]; then
     shorebird patch android --release-version=latest "--dart-define=BUILD_NUMBER=$BUILD_REF" "$@" -- "${EXTRA[@]}"
