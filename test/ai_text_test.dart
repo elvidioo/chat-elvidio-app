@@ -30,4 +30,8 @@ void main() {
   test('markdown nettoyé', () {
     expect(cleanAiText('## Titre\n* un\n* deux'), 'Titre\n• un\n• deux');
   });
+
+  test('noms de variables de code gardés', () {
+    expect(humanizeMath('user_name = 3'), 'user_name = 3');
+  });
 }

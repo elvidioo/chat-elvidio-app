@@ -131,11 +131,19 @@ String _scripts(String s, String marker, Map<String, String> table) {
           i = b.$2;
           continue;
         }
-      } else if (i + 1 < s.length && RegExp(r'[0-9a-zA-Z+\-]').hasMatch(s[i + 1]) && marker == '^') {
+      } else if (i + 1 < s.length &&
+          RegExp(r'[0-9a-zA-Z+\-]').hasMatch(s[i + 1]) &&
+          marker == '^' &&
+          !(i + 2 < s.length && RegExp(r'[A-Za-z]').hasMatch(s[i + 2]) && RegExp(r'[A-Za-z]').hasMatch(s[i + 1]))) {
         out.write(_script(s[i + 1], table, marker));
         i += 2;
         continue;
-      } else if (i + 1 < s.length && RegExp(r'[0-9a-zA-Z]').hasMatch(s[i + 1]) && marker == '_') {
+      } else if (i + 1 < s.length &&
+          RegExp(r'[0-9a-zA-Z]').hasMatch(s[i + 1]) &&
+          marker == '_' &&
+          // u_n oui ; snake_case ou nom_de_fichier non (une lettre suivie d'une autre lettre)
+          !(i + 2 < s.length && RegExp(r'[A-Za-z0-9]').hasMatch(s[i + 2])) &&
+          !(i > 0 && RegExp(r'[A-Za-z]').hasMatch(s[i - 1]) && i > 1 && RegExp(r'[A-Za-z]').hasMatch(s[i - 2]))) {
         // indice sans accolades : un seul caractère (u_n → uₙ)
         out.write(_script(s[i + 1], table, marker));
         i += 2;
