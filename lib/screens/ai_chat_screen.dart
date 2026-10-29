@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../ai_text.dart';
 import '../theme.dart';
 
 /// Discussion directe avec « Elvidio IA ».
@@ -199,12 +200,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                         : AppColors.surface,
                                 borderRadius: BorderRadius.circular(18),
                               ),
-                              child: SelectableText(
-                                l.text,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  height: 1.35,
-                                  color: l.mine && !l.error ? Colors.white : AppColors.text,
+                              child: SelectableText.rich(
+                                _spans(
+                                  l.mine ? l.text : cleanAiText(l.text),
+                                  TextStyle(
+                                    fontSize: 16,
+                                    height: 1.35,
+                                    color: l.mine && !l.error ? Colors.white : AppColors.text,
+                                  ),
+                                  bold: !l.mine,
                                 ),
                               ),
                             ),
@@ -241,6 +245,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
       ),
     );
   }
+}
+
+/// Texte avec le **gras** du Markdown rendu en vrai gras.
+TextSpan _spans(String text, TextStyle style, {bool bold = true}) {
+  if (!bold || !text.contains('**')) return TextSpan(text: text, style: style);
+  final parts = text.split('**');
+  return TextSpan(style: style, children: [
+    for (var i = 0; i < parts.length; i++)
+      TextSpan(
+        text: parts[i],
+        style: i.isOdd ? const TextStyle(fontWeight: FontWeight.w800) : null,
+      ),
+  ]);
 }
 
 /// Avatar de l'assistant : pastille verte et or.
