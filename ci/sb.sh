@@ -9,7 +9,7 @@ if [ -n "$SHOREBIRD_TOKEN" ]; then
   if [ "$MODE" = "patch" ]; then
     shorebird patch android --release-version=latest "--dart-define=BUILD_NUMBER=$BUILD_REF" "$@" -- "${EXTRA[@]}"
   else
-    shorebird release android --artifact apk --flutter-version=latest --build-name=1.0.0 "--build-number=$RUN" "--dart-define=BUILD_NUMBER=$RUN" "$@" -- "${EXTRA[@]}"
+    shorebird release android --artifact apk --flutter-version=latest --build-name=1.0.0 "--build-number=$((RUN + 10000))" "--dart-define=BUILD_NUMBER=$RUN" "$@" -- "${EXTRA[@]}"
   fi
 else
   flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64 "${EXTRA[@]}" "--build-number=$RUN" "--dart-define=BUILD_NUMBER=$RUN" "$@"
