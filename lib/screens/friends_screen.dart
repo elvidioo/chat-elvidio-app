@@ -62,7 +62,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
       }
       _error = null;
       try {
-        final sg = await _db.rpc('suggest_friends');
+        final sg = await _db.rpc('suggest_people');
         _suggestions = List<Map<String, dynamic>>.from(sg as List);
       } catch (_) {}
     } catch (_) {
@@ -270,12 +270,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
                     'avatar_url': p['avatar_url'],
                   };
                   final n = (p['mutual'] as num?)?.toInt() ?? 0;
+                  final g = (p['shared_groups'] as num?)?.toInt() ?? 0;
                   return _row(
                     id,
                     p['pseudo']?.toString() ?? 'Utilisateur',
                     subtitle: n > 0
                         ? '$n ami${n > 1 ? 's' : ''} en commun'
-                        : null,
+                        : (g > 0 ? '$g groupe${g > 1 ? 's' : ''} en commun' : null),
                     actions: [
                       FilledButton(
                         onPressed: () => _request(id),
