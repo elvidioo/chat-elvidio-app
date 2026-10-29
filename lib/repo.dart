@@ -242,7 +242,7 @@ class Repo {
             'content': item['content'],
             if (item['reply_to'] != null) 'reply_to': item['reply_to'],
           }, onConflict: 'sender,client_id', ignoreDuplicates: true)
-              .timeout(const Duration(seconds: 10));
+              .timeout(const Duration(seconds: 8));
           outbox.value =
               outbox.value.where((m) => m['client_id'] != item['client_id']).toList();
           await _saveOutbox();
@@ -256,17 +256,33 @@ class Repo {
           } else {
             item['_failed'] = true;
             outbox.value = List<Map<String, dynamic>>.from(outbox.value);
+            _quickRetry();
             break;
           }
         } catch (_) {
           item['_failed'] = true;
           outbox.value = List<Map<String, dynamic>>.from(outbox.value);
+          _quickRetry();
           break; // pas de réseau : on réessaiera
         }
       }
     } finally {
       _flushing = false;
     }
+  }
+
+  Timer? _quick;
+  int _quickTries = 0;
+
+  /// Après un échec d'envoi : nouvel essai après 2 s, 3 s, 4 s… (au lieu d'attendre 10 s).
+  void _quickRetry() {
+    _quick?.cancel();
+    _quickTries = min(_quickTries + 1, 5);
+    _quick = Timer(Duration(seconds: 1 + _quickTries), () {
+      flush().then((_) {
+        if (outbox.value.isEmpty) _quickTries = 0;
+      });
+    });
   }
 
   void _startFlushTimer() {
@@ -348,6 +364,7 @@ class Repo {
     if (_uid != uid) {
       _uid = uid;
       _known.clear();
+      _polled.clear();
       messages.value = [];
       profiles = [];
       names.clear();
@@ -356,6 +373,7 @@ class Repo {
     }
     _startFlushTimer();
     flush();
+    _startPoll();
     _subscribe();
     _subscribeReactions();
     _subscribeGroups();
@@ -389,6 +407,49 @@ class Repo {
     }
   }
 
+  Timer? _pollTimer;
+  bool _polling = false;
+  final Map<dynamic, Map<String, dynamic>> _polled = {};
+
+  /// Filet de sécurité : toutes les 6 s (app ouverte), on demande seulement les messages
+  /// plus récents que le dernier connu. Si la connexion temps réel est endormie
+  /// (réseau mobile instable), le message arrive quand même en quelques secondes.
+  void _startPoll() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 6), (_) => _poll());
+  }
+
+  Future<void> _poll() async {
+    final uid = _uid;
+    if (uid == null || _polling) return;
+    final life = WidgetsBinding.instance.lifecycleState;
+    if (life != null && life != AppLifecycleState.resumed) return;
+    _polling = true;
+    try {
+      final cur = messages.value;
+      var q = _db.from('messages').select();
+      if (cur.isNotEmpty && cur.first['created_at'] != null) {
+        q = q.gt('created_at', cur.first['created_at'].toString());
+      }
+      final rows = await q
+          .order('created_at', ascending: false)
+          .limit(50)
+          .timeout(const Duration(seconds: 8));
+      if (rows.isEmpty || _uid != uid) return;
+      final have = cur.map((m) => m['id']).toSet();
+      final fresh = rows.where((m) => !have.contains(m['id'])).toList();
+      if (fresh.isEmpty) return;
+      for (final m in fresh) {
+        _polled[m['id']] = m;
+      }
+      _onData([...fresh, ...cur]);
+    } catch (_) {
+      // pas de réseau : on réessaiera au prochain passage
+    } finally {
+      _polling = false;
+    }
+  }
+
   void _scheduleRetry() {
     _retry?.cancel();
     _retry = Timer(const Duration(seconds: 8), () {
@@ -413,7 +474,16 @@ class Repo {
       }
     }
     _silent = false;
-    messages.value = List<Map<String, dynamic>>.from(list);
+    var merged = List<Map<String, dynamic>>.from(list);
+    if (_polled.isNotEmpty) {
+      final ids = merged.map((m) => m['id']).toSet();
+      _polled.removeWhere((id, _) => ids.contains(id));
+      if (_polled.isNotEmpty) {
+        merged = [...merged, ..._polled.values]..sort((a, b) =>
+            b['created_at'].toString().compareTo(a['created_at'].toString()));
+      }
+    }
+    messages.value = merged;
     _scheduleSave();
   }
 
