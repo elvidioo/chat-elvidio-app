@@ -254,8 +254,12 @@ jobs:
         if: env.MODE != 'patch'
         run: |
           ls -la build/app/outputs/flutter-apk/
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk chat-elvidio.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk chat-elvidio-arm32.apk
+          O=build/app/outputs/flutter-apk
+          if [ -f $O/app-arm64-v8a-release.apk ]; then
+            cp $O/app-arm64-v8a-release.apk chat-elvidio.apk; cp $O/app-armeabi-v7a-release.apk chat-elvidio-arm32.apk
+          else
+            cp $O/app-release.apk chat-elvidio.apk; cp $O/app-release.apk chat-elvidio-arm32.apk
+          fi
           zip chat-elvidio-apk.zip chat-elvidio.apk
 
       - name: Compiler la version Lite (sans appels, plus petite)
@@ -293,8 +297,12 @@ jobs:
           if [ -n "$SHOREBIRD_TOKEN" ]; then printf 'app_id: ee6517bc-8bd1-4bdc-9009-3147ecb339ff\nauto_update: true\n' > shorebird.yaml; fi
           ci/sb.sh build/debug-info-lite --dart-define=LITE=true --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build-lite.log
           if [ "$MODE" = patch ]; then exit 0; fi
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk chat-elvidio-lite.apk
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk chat-elvidio-lite-arm32.apk
+          O=build/app/outputs/flutter-apk
+          if [ -f $O/app-arm64-v8a-release.apk ]; then
+            cp $O/app-arm64-v8a-release.apk chat-elvidio-lite.apk; cp $O/app-armeabi-v7a-release.apk chat-elvidio-lite-arm32.apk
+          else
+            cp $O/app-release.apk chat-elvidio-lite.apk; cp $O/app-release.apk chat-elvidio-lite-arm32.apk
+          fi
           ls -la chat-elvidio*.apk
 
       - name: Publier les APK sur la page Releases
