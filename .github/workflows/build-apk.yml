@@ -2,6 +2,12 @@ name: Build Chat Elvidio APK
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "release = nouvel APK ; patch = correctif du code seulement (sans reinstaller)"
+        type: choice
+        default: release
+        options: [release, patch]
   push:
     branches: [main]
 
@@ -11,6 +17,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      MODE: ${{ github.event.inputs.mode || 'release' }}
+      RUN: ${{ github.run_number }}
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
 
     steps:
       - name: Recuperer le code
@@ -20,6 +30,16 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+
+      - name: Installer Shorebird
+        if: env.SHOREBIRD_TOKEN != ''
+        uses: shorebirdtech/setup-shorebird@v1
+
+      - name: Numero de l APK a corriger
+        if: env.MODE == 'patch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "BUILD_REF=$(gh release view --json tagName --jq .tagName | sed 's/build-//')" >> "$GITHUB_ENV"
 
       - name: Creer le projet Android
         run: flutter create --platforms=android --project-name chat_elvidio_app .
@@ -155,6 +175,12 @@ jobs:
               sys.exit(1)
           PY
 
+      - name: Configurer Shorebird (application complete)
+        if: env.SHOREBIRD_TOKEN != ''
+        run: |
+          printf 'app_id: 2fd7f8ff-0077-44aa-985d-d4a4202f445b\nauto_update: true\n' > shorebird.yaml
+          printf '  assets:\n    - shorebird.yaml\n' >> pubspec.yaml
+
       - name: Installer les dependances
         run: flutter pub get
 
@@ -211,7 +237,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -o pipefail
-          flutter build apk --release --split-per-abi --no-shrink --obfuscate --split-debug-info=build/debug-info --build-number=${{ github.run_number }} --dart-define=BUILD_NUMBER=${{ github.run_number }} --target-platform android-arm,android-arm64 --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build.log
+          ci/sb.sh build/debug-info --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build.log
 
       - name: Afficher les erreurs de compilation
         if: failure()
@@ -225,6 +251,7 @@ jobs:
           echo "::error title=Erreurs de compilation::$MSG"
 
       - name: Garder les APK complets
+        if: env.MODE != 'patch'
         run: |
           ls -la build/app/outputs/flutter-apk/
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk chat-elvidio.apk
@@ -263,12 +290,15 @@ jobs:
           cp ci/lite/call_service.dart lib/call_service.dart
           rm -f lib/screens/call_screen.dart
           flutter pub get
-          flutter build apk --release --split-per-abi --no-shrink --obfuscate --split-debug-info=build/debug-info-lite --build-number=${{ github.run_number }} --dart-define=BUILD_NUMBER=${{ github.run_number }} --dart-define=LITE=true --target-platform android-arm,android-arm64 --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build-lite.log
+          if [ -n "$SHOREBIRD_TOKEN" ]; then printf 'app_id: ee6517bc-8bd1-4bdc-9009-3147ecb339ff\nauto_update: true\n' > shorebird.yaml; fi
+          ci/sb.sh build/debug-info-lite --dart-define=LITE=true --dart-define=SUPABASE_URL="$SUPABASE_URL" --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" 2>&1 | tee build-lite.log
+          if [ "$MODE" = patch ]; then exit 0; fi
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk chat-elvidio-lite.apk
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk chat-elvidio-lite-arm32.apk
           ls -la chat-elvidio*.apk
 
       - name: Publier les APK sur la page Releases
+        if: env.MODE != 'patch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -278,6 +308,7 @@ jobs:
             --latest
 
       - name: Publier l APK
+        if: env.MODE != 'patch'
         uses: actions/upload-artifact@v4
         with:
           name: chat-elvidio-apk
