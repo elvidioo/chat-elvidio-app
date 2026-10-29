@@ -245,7 +245,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          { grep -nE "error|Error|FAILURE|Could not|e: |not found|Unresolved|undefined|isn.t defined|doesn.t" build.log | head -12; grep -A8 "What went wrong" build.log | head -14; } > /tmp/err.txt || true
+          { grep -nE "error|Error|FAILURE|Could not|e: |not found|Unresolved|undefined|isn.t defined|doesn.t" build.log | head -12; grep -A8 "What went wrong" build.log | head -14; grep -B14 -A3 -i "asset changes" build.log | head -30; } > /tmp/err.txt || true
           if [ -n "$SUPABASE_ANON_KEY" ]; then sed -i "s|$SUPABASE_ANON_KEY|***|g" /tmp/err.txt; fi
           MSG=$(cut -c1-300 /tmp/err.txt | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::error title=Erreurs de compilation::$MSG"
