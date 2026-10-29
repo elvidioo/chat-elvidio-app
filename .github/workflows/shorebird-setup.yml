@@ -1,0 +1,40 @@
+name: Shorebird setup (une seule fois)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - uses: shorebirdtech/setup-shorebird@v1
+      - name: Creer le projet Android
+        run: flutter create --platforms=android --project-name chat_elvidio_app .
+      - name: Aide des commandes
+        run: |
+          shorebird --version
+          shorebird init --help || true
+          shorebird release android --help || true
+          shorebird patch android --help || true
+      - name: Enregistrer l app complete
+        run: |
+          shorebird init --force --display-name "Chat Elvidio" || shorebird init --force
+          echo "::notice title=APP_ID complete::$(grep app_id shorebird.yaml)"
+          cat shorebird.yaml
+          cp shorebird.yaml /tmp/full.yaml
+      - name: Enregistrer l app Lite
+        run: |
+          rm -f shorebird.yaml
+          git checkout pubspec.yaml
+          shorebird init --force --display-name "Chat Elvidio Lite"
+          echo "::notice title=APP_ID lite::$(grep app_id shorebird.yaml)"
+          cat shorebird.yaml
