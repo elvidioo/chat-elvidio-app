@@ -16,7 +16,7 @@ async function generate(system: string, convo: Turn[]): Promise<string> {
   const ant = Deno.env.get('ANTHROPIC_API_KEY');
   const custom = Deno.env.get('AI_MODEL');
   if (gem) {
-    const models = custom ? [custom] : ['gemini-flash-lite-latest', 'gemini-3.8-flash', 'gemini-flash-latest'];
+    const models = custom ? [custom] : ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-flash-lite-latest'];
     let last = '';
     const all: string[] = [];
     for (const m of models) {
@@ -24,14 +24,14 @@ async function generate(system: string, convo: Turn[]): Promise<string> {
       try {
         res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
         method: 'POST',
-        signal: AbortSignal.timeout(12000),
+        signal: AbortSignal.timeout(14000),
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': gem },
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: convo.map((c) => ({ role: c.role === 'user' ? 'user' : 'model', parts: [{ text: c.text }] })),
           generationConfig: {
-            maxOutputTokens: 600,
-            temperature: 0.8,
+            maxOutputTokens: 1000,
+            temperature: 0.7,
             ...(m.startsWith('gemini-2.5') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
           },
         }),
@@ -97,11 +97,20 @@ Deno.serve(async (req) => {
     convo.push({ role: 'user', text: msg });
     while (convo.length > 1 && convo[0].role !== 'user') convo.shift();
 
+    const today = new Date().toLocaleDateString('fr-FR', { dateStyle: 'full', timeZone: 'Africa/Porto-Novo' });
+    const first = convo.length <= 1;
     const system =
-      `Tu es « Elvidio IA », l'assistant intégré à l'application de messagerie Chat Elvidio. Tu discutes avec ${me?.pseudo ?? 'un utilisateur'}. ` +
-      `Réponds dans la langue de l'utilisateur (français par défaut), de façon chaleureuse, claire et concise (quelques phrases, plus si on te le demande). ` +
-      `Tu peux aider : répondre à des questions, expliquer, aider à rédiger un message, réviser un cours, proposer des idées, discuter simplement. ` +
-      `Sois honnête : si tu ne sais pas ou si l'information peut avoir changé, dis-le. Tu n'es pas médecin, avocat ni conseiller financier : pour ces sujets, donne des informations générales et conseille un professionnel. ` +
+      `Tu es « Elvidio IA », l'assistant intelligent intégré à l'application Chat Elvidio. Nous sommes le ${today}. ` +
+      `L'utilisateur s'appelle ${me?.pseudo ?? 'inconnu'} (n'utilise son prénom que très rarement, jamais à chaque message). ` +
+      `${first ? 'C\'est le début de la discussion : tu peux saluer une seule fois, brièvement.' : 'La discussion est déjà en cours : NE SALUE PAS et ne demande PAS « comment ça va » ; va directement au fond.'} ` +
+      `Réponds d'abord précisément à ce qui est demandé, sans formule d'introduction ni remplissage. ` +
+      `Sois vraiment utile et intelligent : raisonne, donne des explications claires, des exemples concrets, des étapes quand il le faut, et propose la suite utile. ` +
+      `Adapte la longueur : court pour une question simple, détaillé pour un sujet complexe ou un cours. ` +
+      `Pose une question de clarification seulement si c'est indispensable. ` +
+      `Réponds dans la langue de l'utilisateur (français par défaut), ton naturel et chaleureux, comme un ami compétent. ` +
+      `Tu peux aider à : répondre à des questions, expliquer, réviser (maths, sciences, philosophie…), rédiger des messages, coder, planifier, proposer des idées. ` +
+      `Sois honnête : si tu ne sais pas ou si l'information peut avoir changé, dis-le au lieu d'inventer. ` +
+      `Pour la santé, le droit ou l'argent, donne des informations générales et conseille un professionnel. ` +
       `Refuse poliment ce qui est dangereux ou illégal. Ne prétends pas être humain.`;
 
     const reply = (await generate(system, convo)).slice(0, 3500);

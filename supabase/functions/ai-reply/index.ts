@@ -15,8 +15,7 @@ function inWindow(s: any, now: Date): boolean {
 async function generate(system: string, convo: { role: 'user' | 'assistant'; text: string }[]): Promise<string> {
   const gem = Deno.env.get('GEMINI_API_KEY');
   const ant = Deno.env.get('ANTHROPIC_API_KEY');
-  const model = Deno.env.get('AI_MODEL');
-  const ctl = AbortSignal.timeout(20000);
+  const custom = Deno.env.get('AI_MODEL');
   if (gem) {
     const models = custom ? [custom] : ['gemini-flash-lite-latest', 'gemini-3.8-flash', 'gemini-flash-latest'];
     const errs: string[] = [];
@@ -52,10 +51,10 @@ async function generate(system: string, convo: { role: 'user' | 'assistant'; tex
   if (ant) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      signal: ctl,
+      signal: AbortSignal.timeout(20000),
       headers: { 'Content-Type': 'application/json', 'x-api-key': ant, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: model || 'claude-haiku-5-5',
+        model: custom || 'claude-haiku-5-5',
         max_tokens: 300,
         system,
         messages: convo.map((c) => ({ role: c.role, content: c.text })),
@@ -79,17 +78,22 @@ Deno.serve(async (req) => {
     const { data: s } = await db.from('ai_settings').select('*').eq('user_id', msg.receiver).maybeSingle();
     if (!s || !s.enabled || !inWindow(s, new Date())) return new Response('off');
 
+    // Rafale de messages : on attend un instant et seul le dernier message déclenche la réponse.
+    await new Promise((r) => setTimeout(r, 4000));
+    const { count: newer } = await db.from('messages').select('id', { count: 'exact', head: true })
+      .eq('sender', msg.sender).eq('receiver', msg.receiver).gt('id', msg.id);
+    if ((newer ?? 0) > 0) return new Response('newer message will answer');
+
     const since = (mins: number) => new Date(Date.now() - mins * 60000).toISOString();
     // Le propriétaire a répondu lui-même récemment : il est revenu.
     const { count: own } = await db.from('messages').select('id', { count: 'exact', head: true })
-      .eq('sender', msg.receiver).eq('receiver', msg.sender).eq('is_ai', false).gt('created_at', since(10));
+      .eq('sender', msg.receiver).eq('receiver', msg.sender).eq('is_ai', false).gt('created_at', since(5));
     if ((own ?? 0) > 0) return new Response('owner active');
-    // Limites : 5 réponses IA par heure et par contact, au moins 15 s entre deux.
+    // Limites : 12 réponses IA par heure et par contact.
     const { data: recent } = await db.from('messages').select('created_at')
       .eq('sender', msg.receiver).eq('receiver', msg.sender).eq('is_ai', true).gt('created_at', since(60))
       .order('created_at', { ascending: false });
-    if ((recent?.length ?? 0) >= 5) return new Response('limit');
-    if (recent && recent[0] && Date.now() - new Date(recent[0].created_at).getTime() < 15000) return new Response('too fast');
+    if ((recent?.length ?? 0) >= 12) return new Response('limit');
 
     const { data: hist } = await db.from('messages').select('sender, content, is_ai, media_url')
       .or(`and(sender.eq.${msg.sender},receiver.eq.${msg.receiver}),and(sender.eq.${msg.receiver},receiver.eq.${msg.sender})`)
