@@ -86,6 +86,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _toBottom();
   }
 
+  void _prefill(String s) {
+    _text.text = s;
+    _text.selection = TextSelection.collapsed(offset: s.length);
+  }
+
+  static const _shortcuts = <(String, String)>[
+    ('📘 Expliquer un cours', 'Explique-moi simplement le cours sur '),
+    ('✍️ Exercice corrigé', 'Donne-moi un exercice corrigé, étape par étape, sur '),
+    ('🧠 Quiz de révision', 'Fais-moi un quiz de 5 questions (niveau Terminale) sur '),
+    ('📝 Résumé de chapitre', 'Fais-moi un résumé clair du chapitre '),
+    ('✉️ Écrire un message', 'Aide-moi à écrire un message pour '),
+  ];
+
   void _toBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
@@ -163,6 +176,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
                                 'Pose-moi une question, demande-moi de t\'aider à écrire un message, de réviser un cours ou juste discuter.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: AppColors.muted),
+                              ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  for (final s in _shortcuts)
+                                    ActionChip(
+                                      label: Text(s.$1),
+                                      onPressed: () => _prefill(s.$2),
+                                    ),
+                                ],
                               ),
                             ],
                           ),

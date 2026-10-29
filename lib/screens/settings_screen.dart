@@ -14,6 +14,7 @@ import '../repo.dart';
 import 'admin_screen.dart';
 import 'ai_assistant_screen.dart';
 import 'auth_screen.dart';
+import 'invite_screen.dart';
 import 'premium_screen.dart';
 
 import '../notifications.dart';
@@ -78,6 +79,15 @@ class SettingsScreen extends StatelessWidget {
                 context, MaterialPageRoute(builder: (_) => const AiAssistantScreen())),
           ),
           section('Soutien'),
+          ListTile(
+            leading: Icon(Icons.group_add_rounded, color: AppColors.primary),
+            title: const Text('Inviter des amis'),
+            subtitle: Text('Partage ton code : 3 jours de Premium chacun.',
+                style: TextStyle(color: AppColors.muted)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const InviteScreen())),
+          ),
           ListTile(
             leading: const Icon(Icons.star_rounded, color: AppColors.gold),
             title: const Text('Premium'),

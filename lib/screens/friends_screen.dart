@@ -5,6 +5,7 @@ import '../repo.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'contact_profile_screen.dart';
+import 'invite_screen.dart';
 
 /// Amis : demandes reçues, recherche par pseudo, liste des amis.
 class FriendsScreen extends StatefulWidget {
@@ -193,6 +194,14 @@ class _FriendsScreenState extends State<FriendsScreen> {
               ),
             ),
             if (_searching) const LinearProgressIndicator(minHeight: 2),
+            ListTile(
+              leading: Icon(Icons.group_add_rounded, color: AppColors.primary),
+              title: const Text('Inviter des amis'),
+              subtitle: Text('Partage ton code : 3 jours de Premium chacun.',
+                  style: TextStyle(color: AppColors.muted)),
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const InviteScreen())),
+            ),
             if (_results.isNotEmpty) _title('Résultats'),
             for (final p in _results)
               Builder(builder: (context) {
