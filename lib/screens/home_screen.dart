@@ -13,6 +13,7 @@ import 'app_nav_bar.dart';
 import 'chats_tab.dart';
 import 'new_chat_sheet.dart';
 import 'feed_tab.dart';
+import '../welcome.dart';
 import 'nearby_screen.dart';
 import 'profile_screen.dart';
 
@@ -42,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (AppSettings.I.notifications.value) Notifier.requestPermission();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ensureProfile();
+      if (mounted) await showWelcomeIfNeeded(context);
       if (mounted) checkAndPrompt(context, silent: true);
     });
   }

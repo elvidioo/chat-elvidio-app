@@ -11,6 +11,7 @@ import 'communities_screen.dart';
 import 'search_screen.dart';
 import 'ai_chat_screen.dart';
 import 'stories_strip.dart';
+import 'public_groups_strip.dart';
 import 'suggestions_strip.dart';
 import 'friends_screen.dart';
 import 'group_chat_screen.dart';
@@ -503,6 +504,7 @@ class _ChatsTabState extends State<ChatsTab> {
       ));
     }
     if (query.isEmpty) children.add(const SuggestionsStrip());
+    if (query.isEmpty) children.add(const PublicGroupsStrip());
     if (query.isEmpty && all.isNotEmpty) children.add(contactsRow(all));
     if (entries.isEmpty) {
       children.add(all.isEmpty
