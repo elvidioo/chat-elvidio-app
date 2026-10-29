@@ -17,24 +17,9 @@ jobs:
         with:
           channel: stable
       - uses: shorebirdtech/setup-shorebird@v1
-      - name: Creer le projet Android
-        run: flutter create --platforms=android --project-name chat_elvidio_app .
-      - name: Aide des commandes
+      - name: Liste des apps et aide
         run: |
-          shorebird --version
-          shorebird init --help || true
-          shorebird release android --help || true
-          shorebird patch android --help || true
-      - name: Enregistrer l app complete
-        run: |
-          shorebird init --force --display-name "Chat Elvidio" || shorebird init --force
-          echo "::notice title=APP_ID complete::$(grep app_id shorebird.yaml)"
-          cat shorebird.yaml
-          cp shorebird.yaml /tmp/full.yaml
-      - name: Enregistrer l app Lite
-        run: |
-          rm -f shorebird.yaml
-          git checkout pubspec.yaml
-          shorebird init --force --display-name "Chat Elvidio Lite"
-          echo "::notice title=APP_ID lite::$(grep app_id shorebird.yaml)"
-          cat shorebird.yaml
+          ann() { printf '%s' "$2" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g' | sed "s/^/::notice title=$1::/"; echo; }
+          ann apps "$(shorebird apps list 2>&1 | head -30)"
+          ann release "$(shorebird release android --help 2>&1 | head -60)"
+          ann patch "$(shorebird patch android --help 2>&1 | head -60)"
