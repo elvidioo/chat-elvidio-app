@@ -44,6 +44,15 @@ jobs:
       - name: Creer le projet Android
         run: flutter create --platforms=android --project-name chat_elvidio_app .
 
+      - name: Icone de l application (Veyra)
+        run: |
+          for d in ci/icons/mipmap-*; do
+            n=$(basename "$d")
+            mkdir -p "android/app/src/main/res/$n"
+            cp "$d/ic_launcher.png" "android/app/src/main/res/$n/ic_launcher.png"
+          done
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26 android/app/src/main/res/drawable-v21 2>/dev/null || true
+
       - name: Configurer Android (permissions, minSdk)
         run: |
           python3 - <<'PY'
