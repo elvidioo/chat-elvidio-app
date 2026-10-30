@@ -1,4 +1,4 @@
-name: Build Chat Elvidio APK
+name: Build Veyra APK
 
 on:
   workflow_dispatch:
@@ -64,7 +64,7 @@ jobs:
                   '        </intent-filter>\n'
                   '        <meta-data android:name="flutter_deeplinking_enabled" android:value="false"/>\n')
           # Les appels entrants peuvent allumer l'écran et s'afficher sur l'écran verrouillé.
-          x = re.sub(r'android:label="[^"]*"', 'android:label="Chat Elvidio"', x, count=1)
+          x = re.sub(r'android:label="[^"]*"', 'android:label="Veyra"', x, count=1)
           x = x.replace('android:name=".MainActivity"', 'android:name=".MainActivity" android:showWhenLocked="true" android:turnScreenOn="true"', 1)
           x = x.replace("</activity>", link + "    </activity>", 1)
           mf.write_text(x)
@@ -281,7 +281,7 @@ jobs:
                   f.write_text(g2)
           mf = Path("android/app/src/main/AndroidManifest.xml")
           x = mf.read_text()
-          x = re.sub(r'android:label="[^"]*"', 'android:label="Chat Elvidio Lite"', x, count=1)
+          x = re.sub(r'android:label="[^"]*"', 'android:label="Veyra Lite"', x, count=1)
           mf.write_text(x)
           gs = Path("android/app/google-services.json")
           d = json.loads(gs.read_text())
@@ -311,7 +311,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "build-${{ github.run_number }}" chat-elvidio.apk chat-elvidio-arm32.apk chat-elvidio-apk.zip chat-elvidio-lite.apk chat-elvidio-lite-arm32.apk \
-            --title "Chat Elvidio build ${{ github.run_number }}" \
+            --title "Veyra build ${{ github.run_number }}" \
             --notes "chat-elvidio.apk = complet, telephones 64 bits (la plupart). chat-elvidio-arm32.apk = complet, anciens telephones 32 bits. chat-elvidio-lite.apk / chat-elvidio-lite-arm32.apk = version Lite plus petite, sans appels audio/video." \
             --latest
 

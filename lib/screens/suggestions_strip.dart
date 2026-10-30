@@ -51,7 +51,7 @@ class _SuggestionsStripState extends State<SuggestionsStrip> {
     final g = (p['shared_groups'] as num?)?.toInt() ?? 0;
     if (m > 0) return '$m ami${m > 1 ? 's' : ''} en commun';
     if (g > 0) return '$g groupe${g > 1 ? 's' : ''} en commun';
-    return 'Sur Chat Elvidio';
+    return 'Sur Veyra';
   }
 
   @override

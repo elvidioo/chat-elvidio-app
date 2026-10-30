@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../premium.dart';
 import '../theme.dart';
 
-/// Soutenir Chat Elvidio : Premium payé par Mobile Money, validé par l'administrateur.
+/// Soutenir Veyra : Premium payé par Mobile Money, validé par l'administrateur.
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
 
@@ -101,7 +101,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                     children: [
                       const Icon(Icons.star_rounded, color: AppColors.gold, size: 36),
                       const SizedBox(height: 8),
-                      const Text('Chat Elvidio Premium',
+                      const Text('Veyra Premium',
                           style: TextStyle(
                               color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 4),

@@ -129,7 +129,7 @@ class _GroupInviteScreenState extends State<GroupInviteScreen> {
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: () => Share.share(
-                      'Rejoins « $name » sur Chat Elvidio !\n'
+                      'Rejoins « $name » sur Veyra !\n'
                       'Code d\'invitation : $code\n'
                       'Dans l\'app : Discussions → icône Communautés → « Rejoindre ».\n'
                       'Télécharger l\'app : https://github.com/elvidioo/chat-elvidio-app/releases/latest/download/chat-elvidio.apk',

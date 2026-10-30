@@ -322,7 +322,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       leading: Icon(Icons.person_add_alt_1, color: AppColors.primary),
                       title: const Text('Inviter des amis'),
                       onTap: () => Share.share(
-                        'Rejoins-moi sur Chat Elvidio ! Télécharge l\'app ici : '
+                        'Rejoins-moi sur Veyra ! Télécharge l\'app ici : '
                         'https://github.com/elvidioo/chat-elvidio-app/releases/latest/download/chat-elvidio.apk',
                       ),
                     ),

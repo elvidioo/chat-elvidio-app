@@ -217,7 +217,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   const AppLogo(),
                   const SizedBox(height: 16),
                   const Text(
-                    'Chat Elvidio',
+                    'Veyra',
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,

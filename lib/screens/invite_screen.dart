@@ -60,7 +60,7 @@ class _InviteScreenState extends State<InviteScreen> {
   }
 
   String get _message =>
-      'Rejoins-moi sur Chat Elvidio : messages, appels, stories et une IA qui t\'aide à réviser !\n\n'
+      'Rejoins-moi sur Veyra : messages, appels, stories et une IA qui t\'aide à réviser !\n\n'
       'Télécharge l\'app : $_fullApk\n'
       'Version Lite (légère, peu de données) : $_liteApk\n\n'
       'Après l\'inscription, entre mon code d\'invitation : ${_code ?? ''}\n'

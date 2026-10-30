@@ -165,7 +165,7 @@ class AppLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Chat Elvidio',
+      label: 'Veyra',
       child: Container(
         width: size,
         height: size,

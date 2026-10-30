@@ -1,4 +1,4 @@
-// Discussion directe avec l'assistant IA de Chat Elvidio.
+// Discussion directe avec l'assistant IA de Veyra.
 // Clés (secrets de fonction) : GEMINI_API_KEY (gratuit) ou ANTHROPIC_API_KEY ; AI_MODEL optionnel.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
     const today = new Date().toLocaleDateString('fr-FR', { dateStyle: 'full', timeZone: 'Africa/Porto-Novo' });
     const first = convo.length <= 1;
     const system =
-      `Tu es « Elvidio IA », l'assistant intelligent intégré à l'application Chat Elvidio. Nous sommes le ${today}. ` +
+      `Tu es « Elvidio IA », l'assistant intelligent intégré à l'application Veyra. Nous sommes le ${today}. ` +
       `L'utilisateur s'appelle ${me?.pseudo ?? 'inconnu'} (n'utilise son prénom que très rarement, jamais à chaque message). ` +
       `${first ? 'C\'est le début de la discussion : tu peux saluer une seule fois, brièvement.' : 'La discussion est déjà en cours : NE SALUE PAS et ne demande PAS « comment ça va » ; va directement au fond.'} ` +
       `Réponds d'abord précisément à ce qui est demandé, sans formule d'introduction ni remplissage. ` +

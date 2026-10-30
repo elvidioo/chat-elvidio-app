@@ -127,7 +127,7 @@ class _RootAppState extends State<RootApp> with WidgetsBindingObserver {
     AppColors.dark = dark;
     return MaterialApp(
       navigatorKey: CallService.navigatorKey,
-      title: 'Chat Elvidio',
+      title: 'Veyra',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(AppColors.dark),
       home: const BootGate(),

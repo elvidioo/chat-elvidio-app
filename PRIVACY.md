@@ -1,4 +1,4 @@
-# Politique de confidentialité — Chat Elvidio
+# Politique de confidentialité — Veyra
 
 Dernière mise à jour : 25 octobre 2026. Contact : ouvrir une « issue » sur https://github.com/elvidioo/chat-elvidio-app/issues
 

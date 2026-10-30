@@ -106,7 +106,7 @@ Future<void> installApk(String path) async {
   }
   if (!status.isGranted) {
     throw const HttpException(
-        'Autorise l\'installation d\'applications pour Chat Elvidio, puis réessaie.');
+        'Autorise l\'installation d\'applications pour Veyra, puis réessaie.');
   }
   final result = await OpenFilex.open(
     path,
@@ -174,7 +174,7 @@ Future<void> promptUpdate(BuildContext context, UpdateInfo info) async {
     builder: (dialogContext) => AlertDialog(
       title: const Text('Mise à jour disponible'),
       content: Text(
-        'Une nouvelle version de Chat Elvidio${info.sizeLabel} est prête. '
+        'Une nouvelle version de Veyra${info.sizeLabel} est prête. '
         'Elle s\'installe par-dessus l\'app, tes messages sont conservés.',
       ),
       actions: [

@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     const { data: owner } = await db.from('profiles').select('pseudo').eq('id', msg.receiver).maybeSingle();
     const { data: other } = await db.from('profiles').select('pseudo').eq('id', msg.sender).maybeSingle();
     const system =
-      `Tu es l'assistant automatique de ${owner?.pseudo ?? 'ton propriétaire'} sur la messagerie Chat Elvidio. ` +
+      `Tu es l'assistant automatique de ${owner?.pseudo ?? 'ton propriétaire'} sur la messagerie Veyra. ` +
       `${owner?.pseudo ?? 'Il'} est indisponible pour le moment et tu réponds à sa place à ${other?.pseudo ?? 'son contact'}. ` +
       `Règles : réponds dans la langue du contact, en 1 à 3 phrases courtes et naturelles. ` +
       `Dis clairement, si c'est utile, que tu es l'assistant et que ${owner?.pseudo ?? 'le propriétaire'} répondra dès qu'il sera disponible. ` +

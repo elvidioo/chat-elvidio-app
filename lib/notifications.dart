@@ -114,7 +114,7 @@ class Notifier {
     if (!_ready) return false;
     await show(
       id: 424242,
-      title: 'Chat Elvidio',
+      title: 'Veyra',
       body: 'Test : les notifications fonctionnent sur ce téléphone.',
     );
     return true;

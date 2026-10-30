@@ -280,7 +280,7 @@ Future<void> _exportChats(BuildContext context) async {
     await f.writeAsString(
         const JsonEncoder.withIndent('  ').convert(rows));
     await Share.shareXFiles([XFile(f.path)],
-        text: 'Mes discussions Chat Elvidio');
+        text: 'Mes discussions Veyra');
   } catch (e) {
     messenger.showSnackBar(
         const SnackBar(content: Text('Export impossible.')));
@@ -410,7 +410,7 @@ class _BackgroundDialogState extends State<_BackgroundDialog> {
                 _battery ? 'App non limitée par la batterie' : 'La batterie peut mettre l\'app en veille'),
             const SizedBox(height: 10),
             Text(
-              'Sur certains téléphones (Tecno, Infinix, Xiaomi, Samsung…), il faut aussi autoriser « Démarrage automatique » et « Aucune restriction » pour Chat Elvidio dans les réglages du téléphone.',
+              'Sur certains téléphones (Tecno, Infinix, Xiaomi, Samsung…), il faut aussi autoriser « Démarrage automatique » et « Aucune restriction » pour Veyra dans les réglages du téléphone.',
               style: TextStyle(color: AppColors.muted, fontSize: 13),
             ),
           ],

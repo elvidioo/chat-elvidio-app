@@ -55,7 +55,7 @@ class _JoinGroupScreenState extends State<JoinGroupScreen> {
     if (raw == null) return;
     final c = parseInviteCode(raw);
     if (c == null) {
-      setState(() => error = 'Ce QR code n\'est pas une invitation Chat Elvidio.');
+      setState(() => error = 'Ce QR code n\'est pas une invitation Veyra.');
       return;
     }
     setState(() => input.text = c);
