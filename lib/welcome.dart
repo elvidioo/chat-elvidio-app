@@ -38,8 +38,8 @@ class _WelcomeState extends State<_Welcome> {
   static const _steps = <(IconData, String, String)>[
     (Icons.chat_bubble_rounded, 'Discute et appelle',
         'Messages, photos, vocaux, appels audio et vidéo, stories : tout au même endroit.'),
-    (Icons.auto_awesome, 'Elvidio IA t\'aide à réviser',
-        'Cours expliqués, exercices corrigés, quiz du bac. Pose-lui n\'importe quelle question.'),
+    (Icons.auto_awesome, 'Lumi t\'aide à réviser',
+        'Ton tuteur : cours expliqués, exercices corrigés, quiz et fiches de révision adaptés à ton niveau.'),
     (Icons.group_add_rounded, 'Invite tes amis',
         'Partage ton code : vous gagnez chacun 3 jours de Premium.'),
   ];
@@ -124,7 +124,7 @@ class _WelcomeState extends State<_Welcome> {
                 nav.pop();
                 nav.push(MaterialPageRoute(builder: (_) => const AiChatScreen()));
               },
-              child: const Text('Essayer Elvidio IA'),
+              child: const Text('Essayer Lumi'),
             ),
         ],
       ),

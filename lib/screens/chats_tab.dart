@@ -495,8 +495,8 @@ class _ChatsTabState extends State<ChatsTab> {
     if (query.isEmpty) {
       children.add(ListTile(
         leading: const AiAvatar(size: 46),
-        title: const Text('Elvidio IA', style: TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text('Discute avec ton assistant intelligent',
+        title: const Text('Lumi', style: TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text('Ton tuteur : cours, exercices, quiz, corrections',
             style: TextStyle(color: AppColors.muted)),
         trailing: Icon(Icons.auto_awesome, color: AppColors.gold, size: 18),
         onTap: () => Navigator.push(

@@ -1,4 +1,4 @@
-// Discussion directe avec l'assistant IA de Veyra.
+// Lumi : tuteur IA de Veyra pour élèves et étudiants (programmes du Bénin).
 // Clés (secrets de fonction) : GEMINI_API_KEY (gratuit) ou ANTHROPIC_API_KEY ; AI_MODEL optionnel.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -72,6 +72,21 @@ async function generate(system: string, convo: Turn[]): Promise<string> {
   throw new Error('aucune clé IA configurée');
 }
 
+const MODES: Record<string, string> = {
+  explain:
+    "MODE « Expliquer une notion » : explique la notion demandée avec une définition simple, l'idée intuitive, un exemple résolu pas à pas, le piège le plus fréquent, puis pose UNE question courte pour vérifier que l'élève a compris.",
+  exercise:
+    "MODE « Générer un exercice » : propose UN exercice adapté au niveau, progressif, avec un énoncé clair. Ne donne PAS la correction tout de suite : invite l'élève à essayer, propose un indice s'il bloque, et dis qu'il peut écrire « correction » pour la voir.",
+  debug:
+    "MODE « Aide sur une erreur » : l'élève te montre sa résolution ou son erreur. Repère l'erreur exacte, explique pourquoi c'est faux, montre la bonne méthode, puis propose un exercice similaire pour s'entraîner.",
+  summary:
+    "MODE « Résumé du chapitre » : fais un résumé structuré et court : l'essentiel à retenir, les définitions et formules, les erreurs fréquentes.",
+  quiz:
+    "MODE « Quiz » : écris 5 questions à choix multiples (A, B, C, D) adaptées au niveau, SANS donner les réponses. Quand l'élève répond, corrige chaque question avec une courte explication et donne sa note sur 5.",
+  sheet:
+    "MODE « Fiche de révision » : fais une fiche de révision : à retenir, formules ou dates clés, méthode type, un exemple corrigé.",
+};
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -79,19 +94,23 @@ Deno.serve(async (req) => {
   const { data: { user } } = await db.auth.getUser(jwt);
   if (!user) return json(401, { error: 'non connecté' });
   try {
-    const { text } = await req.json();
+    const { text, mode } = await req.json();
     const msg = (text ?? '').toString().trim().slice(0, 2000);
     if (!msg) return json(400, { error: 'message vide' });
+    const modeRule = typeof mode === 'string' ? MODES[mode] : undefined;
 
-    const hourAgo = new Date(Date.now() - 3600_000).toISOString();
-    const [{ count }, { data: me }, { data: hist }] = await Promise.all([
+    const dayAgo = new Date(Date.now() - 24 * 3600_000).toISOString();
+    const [{ count }, { data: me }, { data: hist }, { data: st }] = await Promise.all([
       db.from('ai_chats').select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id).eq('role', 'user').gt('created_at', hourAgo),
+        .eq('user_id', user.id).eq('role', 'user').gt('created_at', dayAgo),
       db.from('profiles').select('pseudo').eq('id', user.id).maybeSingle(),
       db.from('ai_chats').select('role, content')
-        .eq('user_id', user.id).order('created_at', { ascending: false }).limit(12),
+        .eq('user_id', user.id).order('created_at', { ascending: false }).limit(14),
+      db.from('ai_student').select('level, serie, field, subjects').eq('user_id', user.id).maybeSingle(),
     ]);
-    if ((count ?? 0) >= 40) return json(429, { error: 'Tu as beaucoup discuté : réessaie dans un moment.' });
+    if ((count ?? 0) >= 40) {
+      return json(429, { error: 'Tu as atteint ta limite de 40 questions pour aujourd\'hui. Reviens demain, bon courage !' });
+    }
     const convo: Turn[] = [];
     for (const h of (hist ?? []).reverse()) convo.push({ role: h.role, text: h.content });
     convo.push({ role: 'user', text: msg });
@@ -99,36 +118,37 @@ Deno.serve(async (req) => {
 
     const today = new Date().toLocaleDateString('fr-FR', { dateStyle: 'full', timeZone: 'Africa/Porto-Novo' });
     const first = convo.length <= 1;
+    const clean = (v: unknown) => String(v ?? '').replace(/[\r\n]+/g, ' ').slice(0, 80);
+    const profile = st
+      ? `Profil de l'élève : niveau ${clean(st.level) || 'non précisé'}` +
+        `${st.serie ? `, série ${clean(st.serie)}` : ''}${st.field ? `, filière ${clean(st.field)}` : ''}` +
+        `${(st.subjects ?? []).length ? `, matières suivies : ${(st.subjects as string[]).map(clean).join(', ')}` : ''}.`
+      : 'Le niveau de l\'élève n\'est pas précisé : demande-le simplement si c\'est utile.';
+
     const system =
-      `Tu es « Elvidio IA », l'assistant intelligent intégré à l'application Veyra. Nous sommes le ${today}. ` +
-      `L'utilisateur s'appelle ${me?.pseudo ?? 'inconnu'} (n'utilise son prénom que très rarement, jamais à chaque message). ` +
-      `${first ? 'C\'est le début de la discussion : tu peux saluer une seule fois, brièvement.' : 'La discussion est déjà en cours : NE SALUE PAS et ne demande PAS « comment ça va » ; va directement au fond.'} ` +
-      `Réponds d'abord précisément à ce qui est demandé, sans formule d'introduction ni remplissage. ` +
-      `Sois vraiment utile et intelligent : raisonne, donne des explications claires, des exemples concrets, des étapes quand il le faut, et propose la suite utile. ` +
-      `Adapte la longueur : court pour une question simple, détaillé pour un sujet complexe ou un cours. ` +
-      `Pose une question de clarification seulement si c'est indispensable. ` +
-      `Réponds dans la langue de l'utilisateur (français par défaut), ton naturel et chaleureux, comme un ami compétent. ` +
-      `Tu peux aider à : répondre à des questions, expliquer, réviser (maths, sciences, philosophie…), rédiger des messages, coder, planifier, proposer des idées. ` +
-      `FORMULES : écris toujours les mathématiques en texte simple et lisible par un humain, avec des symboles Unicode (x², √x, ≤, ≥, ≠, ×, ÷, π, ∞, Σ, ℝ, ℕ, ∈, ⇒, uₙ₊₁, a/b pour les fractions, lim n→∞). N'utilise JAMAIS LaTeX : aucun $, aucun \\frac, \\sqrt, \\leq, ^{}, _{} ni autre commande avec une barre oblique inverse. Pas de titres avec #. ` +
-      `Sois honnête : si tu ne sais pas ou si l'information peut avoir changé, dis-le au lieu d'inventer. ` +
-      `Pour la santé, le droit ou l'argent, donne des informations générales et conseille un professionnel. ` +
-      `Refuse poliment ce qui est dangereux ou illégal. Ne prétends pas être humain.`;
+      `Tu es « Lumi », le tuteur intelligent de l'application Veyra, pour les élèves et étudiants (collège, lycée, université) du Bénin et d'Afrique francophone. Nous sommes le ${today}. ` +
+      `L'élève s'appelle ${me?.pseudo ?? 'inconnu'} (utilise son prénom rarement, jamais à chaque message). ${profile} ` +
+      `${first ? 'C\'est le début de la discussion : salue une seule fois, brièvement.' : 'La discussion est en cours : NE SALUE PAS et ne redemande pas « comment ça va » ; va directement au fond.'} ` +
+      `${modeRule ? modeRule + ' ' : ''}` +
+      `PÉDAGOGIE : adapte-toi au niveau et au programme scolaire béninois (BEPC, Baccalauréat, université). Explique avec des mots simples, étape par étape, comme un bon professeur patient. Donne des exemples concrets du quotidien quand c'est utile (Cotonou, marché, FCFA, foot…). Aide l'élève à comprendre plutôt que de seulement donner la réponse : pour un devoir, guide-le et vérifie ses calculs. Encourage-le sans exagérer. ` +
+      `RIGUEUR : vérifie tes calculs et tes dates. Si tu n'es pas sûr, ou si le programme officiel peut différer, dis-le clairement et conseille de vérifier avec son cours ou son professeur. N'invente jamais de source, de citation ou de date. ` +
+      `FORME : réponds dans la langue de l'élève (français par défaut). Court pour une question simple, détaillé pour un cours. Utilise des listes numérotées pour les étapes et **gras** pour les mots importants. Pas de titres avec #. ` +
+      `FORMULES : écris toujours les mathématiques en texte simple et lisible par un humain, avec des symboles Unicode (x², √x, ≤, ≥, ≠, ×, ÷, π, ∞, Σ, ℝ, ℕ, ∈, ⇒, uₙ₊₁, a/b pour les fractions, lim n→∞). N'utilise JAMAIS LaTeX : aucun $, aucun \\frac, \\sqrt, \\leq, ^{}, _{} ni autre commande avec une barre oblique inverse. ` +
+      `LIMITES : pour la santé, le droit ou l'argent, donne des informations générales et conseille un professionnel. Refuse poliment ce qui est dangereux ou illégal ou aide à tricher à un examen en cours. Ne prétends pas être humain.`;
 
     const reply = (await generate(system, convo)).slice(0, 3500);
     const saved = Promise.resolve(db.from('ai_chats').insert([
       { user_id: user.id, role: 'user', content: msg },
       { user_id: user.id, role: 'assistant', content: reply },
     ]));
-    // Répond tout de suite ; l'enregistrement de l'historique finit en arrière-plan.
     // @ts-ignore EdgeRuntime est fourni par Supabase
     if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(saved); else await saved;
     return json(200, { reply });
   } catch (e) {
     console.log('ai-chat error', String(e));
-    // Dernière erreur gardée pour le diagnostic (jamais la clé : seulement le message du service).
     try {
       await db.from('app_config').upsert({ key: 'ai_last_error', value: `${new Date().toISOString()} ${String(e).slice(0, 400)}` });
     } catch (_) { /* ignore */ }
-    return json(500, { error: 'L\'assistant n\'est pas disponible pour le moment.' });
+    return json(500, { error: 'Le tuteur n\'est pas disponible pour le moment. Réessaie dans un instant.' });
   }
 });
