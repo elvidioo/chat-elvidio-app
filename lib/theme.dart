@@ -21,23 +21,23 @@ class _Palette {
 }
 
 const _light = _Palette(
-  bg: Color(0xFFF6F8F5),
+  bg: Color(0xFFF3F5F3),
   surface: Color(0xFFFFFFFF),
-  surface2: Color(0xFFE3ECE6),
-  primary: Color(0xFF087A46),
-  muted: Color(0xFF58695F),
-  text: Color(0xFF17231C),
-  bubbleTheirs: Color(0xFFE6EEE8),
+  surface2: Color(0xFFE2E8E4),
+  primary: Color(0xFF3F6B57),
+  muted: Color(0xFF5E6B64),
+  text: Color(0xFF1B2420),
+  bubbleTheirs: Color(0xFFE4EAE6),
 );
 
 const _dark = _Palette(
-  bg: Color(0xFF07130F),
-  surface: Color(0xFF10231B),
-  surface2: Color(0xFF1B3428),
-  primary: Color(0xFF20A568),
-  muted: Color(0xFF9DB3A6),
-  text: Color(0xFFE8F2EC),
-  bubbleTheirs: Color(0xFF183226),
+  bg: Color(0xFF111714),
+  surface: Color(0xFF1A231F),
+  surface2: Color(0xFF26332D),
+  primary: Color(0xFF5C8F76),
+  muted: Color(0xFF9AA8A0),
+  text: Color(0xFFE6EDE9),
+  bubbleTheirs: Color(0xFF222D28),
 );
 
 /// Espacements, rayons et durées communs (design system).
@@ -71,10 +71,10 @@ class AppColors {
   static const gold = Color(0xFFD4AF37);
   static Color get goldText =>
       dark ? const Color(0xFFD4AF37) : const Color(0xFF8A6D12);
-  static const deepGreen = Color(0xFF063B2B);
+  static const deepGreen = Color(0xFF26382F);
 
   static LinearGradient get gradient => const LinearGradient(
-        colors: [Color(0xFF087A46), Color(0xFF0B9455)],
+        colors: [Color(0xFF3F6B57), Color(0xFF55856D)],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
