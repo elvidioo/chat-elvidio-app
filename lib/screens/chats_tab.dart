@@ -10,6 +10,7 @@ import '../settings.dart';
 import 'communities_screen.dart';
 import 'search_screen.dart';
 import 'ai_chat_screen.dart';
+import '../features/nova/nova_shell.dart';
 import 'stories_strip.dart';
 import 'public_groups_strip.dart';
 import 'suggestions_strip.dart';
@@ -496,11 +497,14 @@ class _ChatsTabState extends State<ChatsTab> {
       children.add(ListTile(
         leading: const AiAvatar(size: 46),
         title: const Text('Lumi', style: TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text('Ton tuteur : cours, exercices, quiz, corrections',
+        subtitle: Text('Cours, quiz et tuteur pour réussir tes études',
             style: TextStyle(color: AppColors.muted)),
         trailing: Icon(Icons.auto_awesome, color: AppColors.gold, size: 18),
-        onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const AiChatScreen())),
+        onTap: () async {
+          await Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const NovaShell()));
+          if (mounted) setState(() {});
+        },
       ));
     }
     if (query.isEmpty) children.add(const SuggestionsStrip());

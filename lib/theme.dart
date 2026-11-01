@@ -40,6 +40,17 @@ const _dark = _Palette(
   bubbleTheirs: Color(0xFF222D28),
 );
 
+/// Palette « bleu nuit » réservée à l'application Lumi.
+const _nova = _Palette(
+  bg: Color(0xFF050B1F),
+  surface: Color(0xFF0E1A3A),
+  surface2: Color(0xFF1A2A55),
+  primary: Color(0xFF2D7BFF),
+  muted: Color(0xFF93A4C8),
+  text: Color(0xFFEAF0FF),
+  bubbleTheirs: Color(0xFF152447),
+);
+
 /// Espacements, rayons et durées communs (design system).
 class AppSpacing {
   static const xs = 4.0, sm = 8.0, md = 12.0, lg = 16.0, xl = 24.0;
@@ -52,8 +63,9 @@ class AppSpacing {
 /// thème change, puis tout l'arbre de widgets est reconstruit.
 class AppColors {
   static bool dark = false;
+  static bool nova = false; // vrai tant que l'application Lumi est ouverte
 
-  static _Palette get _p => dark ? _dark : _light;
+  static _Palette get _p => nova ? _nova : (dark ? _dark : _light);
 
   static Color get bg => _p.bg;
   static Color get surface => _p.surface;
@@ -80,8 +92,9 @@ class AppColors {
       );
 }
 
-ThemeData buildTheme(bool dark) {
-  final p = dark ? _dark : _light;
+ThemeData buildTheme(bool dark, {bool nova = false}) {
+  if (nova) dark = true;
+  final p = nova ? _nova : (dark ? _dark : _light);
   final scheme = ColorScheme.fromSeed(
     seedColor: p.primary,
     brightness: dark ? Brightness.dark : Brightness.light,
@@ -139,7 +152,9 @@ ThemeData buildTheme(bool dark) {
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: p.bg,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: dark ? const Color(0xFF1B3428) : const Color(0xFFDDEFE3),
+      indicatorColor: nova
+          ? const Color(0xFF1E3A78)
+          : (dark ? const Color(0xFF1B3428) : const Color(0xFFDDEFE3)),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
-import 'screens/ai_chat_screen.dart';
+import 'features/nova/nova_shell.dart';
 import 'screens/invite_screen.dart';
 import 'theme.dart';
 
@@ -122,7 +122,7 @@ class _WelcomeState extends State<_Welcome> {
               onPressed: () {
                 final nav = Navigator.of(context);
                 nav.pop();
-                nav.push(MaterialPageRoute(builder: (_) => const AiChatScreen()));
+                nav.push(MaterialPageRoute(builder: (_) => const NovaShell()));
               },
               child: const Text('Essayer Lumi'),
             ),
