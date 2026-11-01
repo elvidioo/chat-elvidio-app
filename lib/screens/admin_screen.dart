@@ -17,6 +17,7 @@ class _AdminScreenState extends State<AdminScreen> {
   final _price = TextEditingController();
   List<Map<String, dynamic>> _pending = [];
   final Map<String, String> _names = {};
+  List<Map<String, dynamic>> _events = [];
   int _users = 0, _premium = 0;
   bool _loading = true;
 
@@ -53,6 +54,12 @@ class _AdminScreenState extends State<AdminScreen> {
           _names[e['id'].toString()] = e['pseudo']?.toString() ?? '?';
         }
       }
+      final ev = await _db
+          .from('admin_events')
+          .select('id, kind, text, created_at')
+          .order('created_at', ascending: false)
+          .limit(30);
+      _events = List<Map<String, dynamic>>.from(ev);
       _users = (await _db.from('profiles').select('id')).length;
       _premium = (await _db.from('premium').select('user_id').gt('until', DateTime.now().toUtc().toIso8601String())).length;
     } catch (_) {}
@@ -100,6 +107,31 @@ class _AdminScreenState extends State<AdminScreen> {
               children: [
                 Text('$_users comptes · $_premium Premium actifs',
                     style: const TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 16),
+                Text('Alertes récentes',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                if (_events.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text('Aucune alerte pour le moment (nouveaux comptes, téléchargements).',
+                        style: TextStyle(color: AppColors.muted)),
+                  ),
+                for (final e in _events)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                        e['kind'] == 'signup' ? Icons.person_add_alt_1 : Icons.download_rounded,
+                        color: AppColors.primary),
+                    title: Text(e['text'].toString()),
+                    subtitle: Text(
+                        DateTime.tryParse(e['created_at'].toString())
+                                ?.toLocal()
+                                .toString()
+                                .substring(0, 16) ??
+                            '',
+                        style: TextStyle(color: AppColors.muted)),
+                  ),
                 const SizedBox(height: 16),
                 const Text('Prix affiché', style: TextStyle(fontWeight: FontWeight.w700)),
                 TextField(controller: _price),
