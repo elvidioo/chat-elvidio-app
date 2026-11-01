@@ -51,10 +51,11 @@ const novaGradient = LinearGradient(
 );
 
 /// Appelle la fonction serveur qui prépare (et met en cache) les contenus.
-Future<Map<String, dynamic>> novaCall(Map<String, dynamic> body) async {
+Future<Map<String, dynamic>> novaCall(Map<String, dynamic> body,
+    {String fn = 'nova-generate'}) async {
   try {
     final r = await novaDb.functions
-        .invoke('nova-generate', body: body)
+        .invoke(fn, body: body)
         .timeout(const Duration(seconds: 70));
     final d = r.data;
     if (d is Map) return Map<String, dynamic>.from(d);

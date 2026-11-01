@@ -266,8 +266,9 @@ class _TopicScreenState extends State<TopicScreen> {
 
 /// Quiz avec correction et résultat.
 class QuizScreen extends StatefulWidget {
-  const QuizScreen({super.key, required this.topic});
+  const QuizScreen({super.key, this.topic = const {}, this.preset});
   final Map<String, dynamic> topic;
+  final List<Map<String, dynamic>>? preset; // quiz du carnet (non enregistré)
   @override
   State<QuizScreen> createState() => _QuizScreenState();
 }
@@ -295,6 +296,10 @@ class _QuizScreenState extends State<QuizScreen> {
       _finished = false;
     });
     try {
+      if (widget.preset != null) {
+        if (mounted) setState(() => _qs = widget.preset);
+        return;
+      }
       final r = await novaCall({'kind': 'quiz', 'topic_id': widget.topic['id']});
       final qs = (r['questions'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
       if (mounted) setState(() => _qs = qs);
@@ -307,6 +312,7 @@ class _QuizScreenState extends State<QuizScreen> {
     final total = _qs!.length;
     final pct = (_score * 100 / total).round();
     setState(() => _finished = true);
+    if (widget.preset != null) return;
     try {
       final uid = novaDb.auth.currentUser!.id;
       await novaDb.from('edu_attempts').insert({'topic_id': widget.topic['id'], 'score': _score, 'total': total});

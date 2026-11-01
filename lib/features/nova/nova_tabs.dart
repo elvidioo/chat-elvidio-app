@@ -6,7 +6,7 @@ import '../../screens/public_groups_strip.dart';
 import '../../theme.dart';
 import '../../widgets.dart';
 import 'nova_data.dart';
-import 'nova_learn.dart';
+import 'nova_notebook.dart';
 import 'nova_widgets.dart';
 
 /// Choix du niveau et des matières (première ouverture ou modification).
@@ -217,6 +217,8 @@ class _NovaHomeState extends State<NovaHome> {
             ]),
           ),
         ],
+        const SizedBox(height: 16),
+        const NotebookCard(),
         const SizedBox(height: 22),
         Row(children: [
           const Text('Mes matières', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
@@ -272,6 +274,8 @@ class NovaCourses extends StatelessWidget {
       ]),
       Text('Niveau : ${student['level']}', style: TextStyle(color: AppColors.muted)),
       const SizedBox(height: 16),
+      const NotebookCard(),
+      const SizedBox(height: 12),
       for (final s in subjects)
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
@@ -381,4 +385,29 @@ class NovaProfile extends StatelessWidget {
       NovaBadge('Les contenus sont générés par IA : vérifie avec ton cours'),
     ]);
   }
+}
+
+/// Entrée du carnet (sources personnelles).
+class NotebookCard extends StatelessWidget {
+  const NotebookCard({super.key});
+  @override
+  Widget build(BuildContext context) => NovaCard(
+        onTap: () => Navigator.push(context, novaRoute(const NotebookScreen())),
+        child: Row(children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: const Color(0xFF22D3EE).withValues(alpha: 0.16), borderRadius: BorderRadius.circular(15)),
+            child: const Icon(Icons.auto_stories_rounded, color: Color(0xFF22D3EE)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Mon carnet', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              Text('Ajoute tes cours, Lumi t\'aide dessus', style: TextStyle(color: AppColors.muted, fontSize: 13)),
+            ]),
+          ),
+          Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ]),
+      );
 }
