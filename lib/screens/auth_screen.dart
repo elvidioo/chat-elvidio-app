@@ -21,6 +21,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final pseudo = TextEditingController();
   final identifier = TextEditingController();
   final password = TextEditingController();
+  final invite = TextEditingController();
   bool loading = false;
   bool signup = false;
   bool hidePassword = true;
@@ -151,8 +152,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> submit() async {
     final mail = loginEmail(identifier.text);
-    if (mail == null || (signup && !identifier.text.contains('@'))) {
-      setState(() => message = 'Entre une adresse e-mail valide.');
+    if (mail == null) {
+      setState(() => message = 'Entre une adresse e-mail ou un numéro de téléphone valide.');
       return;
     }
     final chosenPseudo = pseudo.text.trim();
@@ -176,6 +177,14 @@ class _AuthScreenState extends State<AuthScreen> {
         await auth.signInWithPassword(email: mail, password: password.text);
       }
 
+      if (signup && auth.currentUser != null && invite.text.trim().isNotEmpty) {
+        try {
+          await Supabase.instance.client
+              .rpc('redeem_invite', params: {'code': invite.text.trim()});
+        } catch (_) {
+          // code invalide ou déjà utilisé : sans importance pour l'inscription
+        }
+      }
       if (!mounted) return;
       if (auth.currentUser != null) {
         _goHome();
@@ -200,6 +209,7 @@ class _AuthScreenState extends State<AuthScreen> {
     pseudo.dispose();
     identifier.dispose();
     password.dispose();
+    invite.dispose();
     super.dispose();
   }
 
@@ -262,7 +272,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: identifier,
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
-                      hintText: 'E-mail',
+                      hintText: 'E-mail ou numéro de téléphone',
                       prefixIcon: const Icon(Icons.alternate_email),
                     ),
                   ),
@@ -283,6 +293,27 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     onSubmitted: (_) => loading ? null : submit(),
                   ),
+                  if (signup) ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: invite,
+                      maxLength: 8,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                        hintText: 'Code d\'invitation (facultatif)',
+                        counterText: '',
+                        prefixIcon: Icon(Icons.card_giftcard_outlined),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Avec un numéro de téléphone, aucun e-mail n\'est envoyé : garde bien ton mot de passe.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: AppColors.muted),
+                      ),
+                    ),
+                  ],
                   if (!signup)
                     Align(
                       alignment: Alignment.centerRight,
