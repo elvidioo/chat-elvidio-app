@@ -4,6 +4,7 @@ import '../../screens/ai_chat_screen.dart';
 import '../../theme.dart';
 import 'nova_data.dart';
 import 'nova_learn.dart';
+import 'nova_notebook.dart';
 import 'nova_tabs.dart';
 
 /// Lumi : application éducative intégrée à Veyra.
@@ -76,7 +77,7 @@ class _NovaShellState extends State<NovaShell> {
         final s = _student!;
         final pages = <Widget>[
           NovaHome(key: ValueKey(_homeKey), student: s, onOpenSubject: _openSubject, onGoCourses: () => setState(() { _i = 1; _visited.add(1); })),
-          if (_visited.contains(1)) NovaCourses(student: s, onOpenSubject: _openSubject, onEdit: () => setState(() => _editing = true)) else const SizedBox(),
+          if (_visited.contains(1)) const NotebookScreen(embedded: true) else const SizedBox(),
           if (_visited.contains(2)) const AiChatScreen() else const SizedBox(),
           if (_visited.contains(3)) const NovaCommunity() else const SizedBox(),
           if (_visited.contains(4)) NovaProfile(student: s, onEdit: () => setState(() => _editing = true)) else const SizedBox(),

@@ -14,7 +14,8 @@ Future<Map<String, dynamic>> _nb(Map<String, dynamic> b) => novaCall(b, fn: 'nov
 /// Carnet : l'élève ajoute ses sources (texte, photos de cours) et Lumi
 /// répond et crée résumés, quiz et fiches UNIQUEMENT à partir d'elles.
 class NotebookScreen extends StatefulWidget {
-  const NotebookScreen({super.key});
+  const NotebookScreen({super.key, this.embedded = false});
+  final bool embedded;
   @override
   State<NotebookScreen> createState() => _NotebookScreenState();
 }
@@ -66,7 +67,7 @@ class _NotebookScreenState extends State<NotebookScreen> {
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(18, 18, 18, MediaQuery.of(ctx).viewInsets.bottom + 18),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Nouvelle source', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const Text('Nouveau cours', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 12),
           TextField(controller: t, maxLength: 80, decoration: const InputDecoration(hintText: 'Titre (ex. Cours de physique, chap. 3)')),
           const SizedBox(height: 8),
@@ -82,7 +83,7 @@ class _NotebookScreenState extends State<NotebookScreen> {
       return;
     }
     try {
-      await novaDb.from('edu_sources').insert({'title': t.text.trim().isEmpty ? 'Source sans titre' : t.text.trim(), 'content': text});
+      await novaDb.from('edu_sources').insert({'title': t.text.trim().isEmpty ? 'Cours sans titre' : t.text.trim(), 'content': text});
       _load();
     } catch (_) {
       _snack('Ajout impossible, réessaie.');
@@ -126,7 +127,7 @@ class _NotebookScreenState extends State<NotebookScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Supprimer cette source ?'),
+        title: const Text('Supprimer ce cours ?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Annuler')),
           TextButton(onPressed: () => Navigator.pop(c, true), child: const Text('Supprimer')),
@@ -146,7 +147,7 @@ class _NotebookScreenState extends State<NotebookScreen> {
     final q = _ask.text.trim();
     if (q.isEmpty || _busy) return;
     if ((_src ?? []).isEmpty) {
-      _snack('Ajoute d\'abord une source.');
+      _snack('Ajoute d\'abord un cours.');
       return;
     }
     final item = _Qa(q);
@@ -170,7 +171,7 @@ class _NotebookScreenState extends State<NotebookScreen> {
 
   Future<void> _make(String type, String label) async {
     if ((_src ?? []).isEmpty) {
-      _snack('Ajoute d\'abord une source.');
+      _snack('Ajoute d\'abord un cours.');
       return;
     }
     if (_busy) return;
@@ -200,13 +201,16 @@ class _NotebookScreenState extends State<NotebookScreen> {
   Widget build(BuildContext context) {
     final src = _src;
     return Scaffold(
-      appBar: AppBar(title: const Text('Mon carnet')),
+      appBar: AppBar(
+        title: Text(widget.embedded ? 'Mes cours' : 'Mon carnet'),
+        automaticallyImplyLeading: !widget.embedded,
+      ),
       body: Column(children: [
         Expanded(
           child: src == null
               ? const NovaLoading('Chargement…')
               : ListView(controller: _scroll, padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), children: [
-                  Text('Ajoute tes cours (texte ou photo). Lumi répond et crée des révisions uniquement à partir de tes sources.',
+                  Text('Ajoute les cours que tu as reçus (texte ou photo de ton cahier). Lumi répond et crée résumés, quiz et fiches uniquement à partir de tes cours.',
                       style: TextStyle(color: AppColors.muted, height: 1.4)),
                   const SizedBox(height: 12),
                   Row(children: [
@@ -288,7 +292,7 @@ class _NotebookScreenState extends State<NotebookScreen> {
                   controller: _ask,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _send(),
-                  decoration: const InputDecoration(hintText: 'Pose une question sur tes sources…'),
+                  decoration: const InputDecoration(hintText: 'Pose une question sur tes cours…'),
                 ),
               ),
               const SizedBox(width: 8),

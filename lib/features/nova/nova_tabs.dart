@@ -160,7 +160,6 @@ class _NovaHomeState extends State<NovaHome> {
 
   @override
   Widget build(BuildContext context) {
-    final subjects = List<String>.from((widget.student['subjects'] as List?) ?? const []);
     final goal = (_today / 2).clamp(0.0, 1.0);
     final topic = _last?['edu_topics'];
     return RefreshIndicator(
@@ -219,31 +218,6 @@ class _NovaHomeState extends State<NovaHome> {
         ],
         const SizedBox(height: 16),
         const NotebookCard(),
-        const SizedBox(height: 22),
-        Row(children: [
-          const Text('Mes matières', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-          const Spacer(),
-          TextButton(onPressed: widget.onGoCourses, child: const Text('Tout voir')),
-        ]),
-        const SizedBox(height: 6),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.45,
-          children: [
-            for (final s in subjects)
-              NovaCard(
-                onTap: () => widget.onOpenSubject(s),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  SubjectChip(s, size: 40),
-                  Text(s, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
-                ]),
-              ),
-          ],
-        ),
       ]),
     );
   }
