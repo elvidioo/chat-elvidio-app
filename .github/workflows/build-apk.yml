@@ -190,6 +190,14 @@ jobs:
           printf 'app_id: 2fd7f8ff-0077-44aa-985d-d4a4202f445b\nauto_update: true\n' > shorebird.yaml
           printf '  assets:\n    - shorebird.yaml\n' >> pubspec.yaml
 
+      - name: Reprendre les versions exactes de la derniere version publiee
+        if: env.MODE == 'patch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          U=$(gh api repos/${{ github.repository }}/releases/latest --jq '.assets[]|select(.name=="pubspec.lock")|.url' || true)
+          if [ -n "$U" ]; then gh api -H "Accept: application/octet-stream" "$U" > pubspec.lock && echo "pubspec.lock repris de la release"; else echo "pas de pubspec.lock dans la release"; fi
+
       - name: Installer les dependances
         run: flutter pub get
 
@@ -270,6 +278,7 @@ jobs:
             cp $O/app-release.apk chat-elvidio.apk; cp $O/app-release.apk chat-elvidio-arm32.apk
           fi
           zip chat-elvidio-apk.zip chat-elvidio.apk
+          mkdir -p keep && cp pubspec.lock keep/pubspec.lock
 
       - name: Compiler la version Lite (sans appels, plus petite)
         env:
@@ -319,7 +328,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "build-${{ github.run_number }}" chat-elvidio.apk chat-elvidio-arm32.apk chat-elvidio-apk.zip chat-elvidio-lite.apk chat-elvidio-lite-arm32.apk \
+          gh release create "build-${{ github.run_number }}" chat-elvidio.apk chat-elvidio-arm32.apk chat-elvidio-apk.zip chat-elvidio-lite.apk chat-elvidio-lite-arm32.apk keep/pubspec.lock \
             --title "Veyra build ${{ github.run_number }}" \
             --notes "chat-elvidio.apk = complet, telephones 64 bits (la plupart). chat-elvidio-arm32.apk = complet, anciens telephones 32 bits. chat-elvidio-lite.apk / chat-elvidio-lite-arm32.apk = version Lite plus petite, sans appels audio/video." \
             --latest
