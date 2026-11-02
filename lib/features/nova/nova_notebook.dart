@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../ai_text.dart';
@@ -71,7 +72,7 @@ class _NotebookScreenState extends State<NotebookScreen> {
           const SizedBox(height: 12),
           TextField(controller: t, maxLength: 80, decoration: const InputDecoration(hintText: 'Titre (ex. Cours de physique, chap. 3)')),
           const SizedBox(height: 8),
-          TextField(controller: c, minLines: 6, maxLines: 10, maxLength: 20000, decoration: const InputDecoration(hintText: 'Colle ici ton cours, tes notes…')),
+          TextField(controller: c, minLines: 6, maxLines: 10, maxLength: 40000, decoration: const InputDecoration(hintText: 'Colle ici ton cours, tes notes…')),
           const SizedBox(height: 10),
           SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ajouter'))),
         ]),
@@ -119,6 +120,45 @@ class _NotebookScreenState extends State<NotebookScreen> {
       if (mounted) {
         setState(() => _busy = false);
         _snack(e is String ? e : 'Photo impossible à lire.');
+      }
+    }
+  }
+
+  Future<void> _addFile() async {
+    try {
+      final f = await openFile(acceptedTypeGroups: const [
+        XTypeGroup(
+          label: 'Documents',
+          extensions: ['pdf', 'txt', 'md', 'csv', 'docx', 'pptx', 'html', 'json'],
+          mimeTypes: [
+            'application/pdf',
+            'text/plain',
+            'text/markdown',
+            'text/csv',
+            'text/html',
+            'application/json',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          ],
+        ),
+      ]);
+      if (f == null) return;
+      final bytes = await f.readAsBytes();
+      if (bytes.length > 5 * 1024 * 1024) {
+        _snack('Fichier trop lourd (5 Mo maximum).');
+        return;
+      }
+      setState(() => _busy = true);
+      final r = await novaCall({'name': f.name, 'data': base64Encode(bytes)}, fn: 'nova-file');
+      if (!mounted) return;
+      setState(() => _busy = false);
+      if (r['truncated'] == true) _snack('Document long : seul le début est gardé.');
+      final title = f.name.replaceAll(RegExp(r'\.[A-Za-z0-9]{1,5}$'), '');
+      await _addText(title: title, content: r['text'].toString());
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        _snack(e is String ? e : 'Fichier impossible à lire.');
       }
     }
   }
@@ -210,14 +250,17 @@ class _NotebookScreenState extends State<NotebookScreen> {
           child: src == null
               ? const NovaLoading('Chargement…')
               : ListView(controller: _scroll, padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), children: [
-                  Text('Ajoute les cours que tu as reçus (texte ou photo de ton cahier). Lumi répond et crée résumés, quiz et fiches uniquement à partir de tes cours.',
+                  Text('Ajoute les cours que tu as reçus (PDF, Word, PowerPoint, texte, ou photo de ton cahier). Lumi répond et crée résumés, quiz et fiches uniquement à partir de tes cours.',
                       style: TextStyle(color: AppColors.muted, height: 1.4)),
                   const SizedBox(height: 12),
                   Row(children: [
                     Expanded(child: FilledButton.icon(onPressed: _busy ? null : () => _addText(), icon: const Icon(Icons.notes_rounded), label: const Text('Texte'))),
                     const SizedBox(width: 10),
                     Expanded(child: FilledButton.icon(onPressed: _busy ? null : _addPhoto, icon: const Icon(Icons.photo_camera_rounded), label: const Text('Photo'))),
+                    const SizedBox(width: 10),
+                    Expanded(child: FilledButton.icon(onPressed: _busy ? null : _addFile, icon: const Icon(Icons.attach_file_rounded), label: const Text('Fichier'))),
                   ]),
+                  if (_busy && _qa.isEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text('Lumi lit ton document…', style: TextStyle(color: AppColors.muted))),
                   const SizedBox(height: 14),
                   for (final s in src)
                     Padding(
